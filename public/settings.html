@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统设置 - 管道防腐层剥离控制系统</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/forms.css">
+    <link rel="stylesheet" href="/css/animations.css">
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar"></aside>
+        <main class="main-content">
+            <div class="page-header">
+                <h1>⚙ 系统设置</h1>
+            </div>
+            <div class="page-body">
+                <div class="grid grid-2 mb-2">
+                    <!-- Settings -->
+                    <div class="card animate-fade-in-up">
+                        <div class="card-header">
+                            <div class="card-title"><span class="icon">⚙</span> 系统参数</div>
+                        </div>
+                        <div id="settingsForm">
+                            <p class="text-dim">加载中...</p>
+                        </div>
+                        <div class="mt-2">
+                            <button class="btn btn-primary" onclick="saveSettings()">保存设置</button>
+                        </div>
+                    </div>
+
+                    <!-- System Info -->
+                    <div class="card animate-fade-in-up stagger-2">
+                        <div class="card-header">
+                            <div class="card-title"><span class="icon">ℹ</span> 系统信息</div>
+                        </div>
+                        <div class="param-card mb-1">
+                            <div class="param-label">系统版本</div>
+                            <div class="param-value" style="font-size:0.9rem;">v1.0.0</div>
+                        </div>
+                        <div class="param-card mb-1">
+                            <div class="param-label">部署平台</div>
+                            <div class="param-value" style="font-size:0.9rem;">Vercel + Neon PostgreSQL</div>
+                        </div>
+                        <div class="param-card mb-1">
+                            <div class="param-label">技术栈</div>
+                            <div class="param-value" style="font-size:0.9rem;">Python + HTML/CSS/JS + ECharts</div>
+                        </div>
+                        <div class="param-card">
+                            <div class="param-label">数据库状态</div>
+                            <div class="param-value" style="font-size:0.9rem;" id="dbStatus">检测中...</div>
+                        </div>
+                        <div class="mt-2">
+                            <button class="btn btn-secondary btn-sm" onclick="initDB()">重新初始化数据库</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audit Log -->
+                <div class="card animate-fade-in-up stagger-3">
+                    <div class="card-header">
+                        <div class="card-title"><span class="icon">📜</span> 审计日志</div>
+                        <div class="flex gap-1">
+                            <select class="form-select" id="auditFilter" style="width:150px;" onchange="loadAuditLog()">
+                                <option value="">全部操作</option>
+                                <option value="login">登录</option>
+                                <option value="register">注册</option>
+                                <option value="create">创建</option>
+                                <option value="update">更新</option>
+                                <option value="delete">删除</option>
+                                <option value="start_test">启动试验</option>
+                                <option value="stop_test">停止试验</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="overflow-x:auto; max-height:400px;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>用户</th>
+                                    <th>操作</th>
+                                    <th>资源类型</th>
+                                    <th>资源ID</th>
+                                    <th>详情</th>
+                                </tr>
+                            </thead>
+                            <tbody id="auditBody">
+                                <tr><td colspan="6" class="text-center text-dim p-3">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="auditPagination"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/nav.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Nav.init();
+
+        let settingsData = {};
+        let auditPage = 1;
+
+        async function loadSettings() {
+            try {
+                const res = await API.get('/settings');
+                const settings = res.settings || [];
+                settingsData = res.settings_map || {};
+                renderSettings(settings);
+                document.getElementById('dbStatus').textContent = '已连接';
+                document.getElementById('dbStatus').style.color = 'var(--success)';
+            } catch (e) {
+                document.getElementById('dbStatus').textContent = '连接失败';
+                document.getElementById('dbStatus').style.color = 'var(--danger)';
+            }
+        }
+
+        function renderSettings(settings) {
+            const container = document.getElementById('settingsForm');
+            container.innerHTML = settings.map(s => `
+                <div class="form-group">
+                    <label class="form-label">${Utils.escapeHtml(s.description || s.setting_key)}</label>
+                    <input type="text" class="form-input setting-input"
+                           data-key="${s.setting_key}"
+                           value="${Utils.escapeHtml(s.setting_value || '')}">
+                </div>
+            `).join('');
+        }
+
+        async function saveSettings() {
+            const inputs = document.querySelectorAll('.setting-input');
+            const updates = {};
+            inputs.forEach(input => {
+                updates[input.dataset.key] = input.value;
+            });
+
+            try {
+                await API.put('/settings', { settings: updates });
+                Utils.showToast('设置已保存', 'success');
+            } catch (e) {
+                Utils.showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        async function loadAuditLog() {
+            const action = document.getElementById('auditFilter').value;
+            try {
+                let url = `/admin_audit?page=${auditPage}&per_page=30`;
+                if (action) url += `&action=${action}`;
+                const res = await API.get(url);
+                renderAuditLog(res.logs || [], res.total, res.page, res.per_page);
+            } catch (e) {
+                document.getElementById('auditBody').innerHTML =
+                    '<tr><td colspan="6" class="text-center text-dim">加载失败</td></tr>';
+            }
+        }
+
+        function renderAuditLog(logs, total, page, perPage) {
+            const tbody = document.getElementById('auditBody');
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-dim p-3">暂无日志</td></tr>';
+                return;
+            }
+            tbody.innerHTML = logs.map(l => `
+                <tr>
+                    <td class="text-dim text-mono" style="font-size:0.75rem;">${Utils.formatDate(l.created_at)}</td>
+                    <td>${Utils.escapeHtml(l.username || '-')}</td>
+                    <td><span class="badge badge-user">${l.action}</span></td>
+                    <td>${l.resource_type || '-'}</td>
+                    <td class="text-mono">${l.resource_id || '-'}</td>
+                    <td class="text-dim" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">${l.details ? JSON.stringify(l.details).substring(0, 50) : '-'}</td>
+                </tr>
+            `).join('');
+
+            const pages = Math.ceil(total / perPage);
+            const container = document.getElementById('auditPagination');
+            if (pages <= 1) { container.innerHTML = ''; return; }
+            let html = '';
+            for (let i = 1; i <= Math.min(pages, 10); i++) {
+                html += `<button class="${i === page ? 'active' : ''}" onclick="auditPage=${i};loadAuditLog()">${i}</button>`;
+            }
+            container.innerHTML = html;
+        }
+
+        async function initDB() {
+            if (!Utils.confirm('确定要重新初始化数据库吗？（已有数据不会丢失）')) return;
+            try {
+                const res = await API.get('/init_db');
+                Utils.showToast(res.message, 'success');
+            } catch (e) {
+                Utils.showToast('初始化失败: ' + e.message, 'error');
+            }
+        }
+
+        loadSettings();
+        loadAuditLog();
+    </script>
+</body>
+</html>

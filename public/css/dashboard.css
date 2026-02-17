@@ -1,0 +1,235 @@
+.dashboard-layout {
+    display: flex;
+    min-height: 100vh;
+    background: var(--bg-primary);
+}
+
+.dashboard-main {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    display: flex;
+    flex-direction: column;
+}
+
+.dashboard-body {
+    flex: 1;
+    padding: 1rem 1.25rem;
+    overflow-y: auto;
+}
+
+.pipe-canvas-container {
+    width: 100%;
+    height: 100%;
+    min-height: 260px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.pipe-canvas-container canvas {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.force-gauge-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+}
+
+.force-gauge-cell {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 6px;
+    text-align: center;
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+}
+
+.force-gauge-cell::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--accent-blue);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform var(--transition-normal);
+}
+
+.force-gauge-cell.active::before {
+    transform: scaleX(1);
+    background: var(--accent-cyan);
+}
+
+.force-gauge-cell.active {
+    border-color: rgba(0, 212, 255, 0.3);
+    background: rgba(0, 212, 255, 0.03);
+}
+
+.force-gauge-cell .gauge-label {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+.force-gauge-cell .gauge-value {
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+    margin: 2px 0;
+}
+
+.force-gauge-cell .gauge-unit {
+    font-size: 0.55rem;
+    color: var(--text-secondary);
+}
+
+.overall-progress {
+    padding: 1rem;
+}
+
+.overall-progress .progress-label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.overall-progress .progress-label .label {
+    color: var(--text-secondary);
+}
+
+.overall-progress .progress-label .value {
+    color: var(--accent-cyan);
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+
+.overall-progress .progress-bar {
+    height: 8px;
+    border-radius: 4px;
+}
+
+.overall-progress .progress-bar .progress-fill {
+    border-radius: 4px;
+}
+
+.activity-list {
+    list-style: none;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(26, 34, 85, 0.4);
+    font-size: 0.8rem;
+}
+
+.activity-item .activity-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-cyan);
+    margin-top: 6px;
+    flex-shrink: 0;
+}
+
+.activity-item .activity-text {
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.activity-item .activity-time {
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+.control-buttons {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.control-buttons .btn {
+    min-width: 120px;
+    padding: 0.8rem 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.emergency-btn {
+    background: linear-gradient(135deg, #cc0033, #ff3366) !important;
+    border: 2px solid var(--danger) !important;
+    color: white !important;
+    box-shadow: 0 0 20px rgba(255, 51, 102, 0.4) !important;
+    animation: glow-pulse-danger 1.5s infinite;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+@keyframes glow-pulse-danger {
+    0%, 100% { box-shadow: 0 0 15px rgba(255, 51, 102, 0.3); }
+    50% { box-shadow: 0 0 35px rgba(255, 51, 102, 0.6); }
+}
+
+.param-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+}
+
+.param-card .param-label {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.param-card .param-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    color: var(--accent-cyan);
+    margin-top: 0.25rem;
+}
+
+@media (max-width: 768px) {
+    .dashboard-main {
+        margin-left: 0;
+    }
+
+    .dashboard-body {
+        padding: 0.75rem;
+    }
+
+    .force-gauge-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+
+    .control-buttons {
+        flex-direction: column;
+    }
+
+    .control-buttons .btn {
+        min-width: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .force-gauge-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}

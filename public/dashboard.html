@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时监控大屏 - 管道防腐层剥离控制系统</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/forms.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/animations.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar"></aside>
+        <main class="main-content">
+            <div class="page-header scan-line-effect">
+                <h1>📊 实时监控大屏</h1>
+                <div class="header-actions">
+                    <span id="runningStatus" class="badge badge-pending">无活动试验</span>
+                    <span class="text-dim text-mono" id="currentTime"></span>
+                </div>
+            </div>
+            <div class="page-body">
+                <!-- Header Bar -->
+                <div class="dashboard-header-bar mb-2 animate-fade-in">
+                    <div class="header-title" id="dashProjectName">管道防腐层剥离控制系统</div>
+                    <div class="header-status">
+                        <div class="status-item">
+                            <span>试验编号:</span>
+                            <span class="value" id="dashTestNum">-</span>
+                        </div>
+                        <div class="status-item">
+                            <span>当前角度:</span>
+                            <span class="value" id="dashAngle">0°</span>
+                        </div>
+                        <div class="status-item">
+                            <span>进度:</span>
+                            <span class="value" id="dashProgress">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stat Cards -->
+                <div class="grid grid-4 mb-2">
+                    <div class="stat-card accent-cyan animate-fade-in-up stagger-1">
+                        <div class="stat-label">平均剥离力</div>
+                        <div class="stat-value" id="statAvgForce">0<span class="stat-unit"> N</span></div>
+                    </div>
+                    <div class="stat-card accent-blue animate-fade-in-up stagger-2">
+                        <div class="stat-label">最大剥离力</div>
+                        <div class="stat-value" id="statMaxForce">0<span class="stat-unit"> N</span></div>
+                    </div>
+                    <div class="stat-card accent-success animate-fade-in-up stagger-3">
+                        <div class="stat-label">活动条带</div>
+                        <div class="stat-value" id="statActiveStrips">0<span class="stat-unit"> /30</span></div>
+                    </div>
+                    <div class="stat-card accent-warning animate-fade-in-up stagger-4">
+                        <div class="stat-label">总拉力</div>
+                        <div class="stat-value" id="statTotalForce">0<span class="stat-unit"> N</span></div>
+                    </div>
+                </div>
+
+                <!-- Main Dashboard Grid -->
+                <div class="dashboard-grid">
+                    <!-- Pipe Visualization -->
+                    <div class="dashboard-chart-card col-span-3 row-span-3 animate-slide-up stagger-1">
+                        <div class="card-title"><span class="icon">◉</span> 管道横截面</div>
+                        <div class="pipe-canvas-container">
+                            <canvas id="pipeCanvas"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Real-time Force Chart -->
+                    <div class="dashboard-chart-card col-span-6 row-span-3 animate-slide-up stagger-2">
+                        <div class="card-title"><span class="icon">〰</span> 实时剥离力曲线</div>
+                        <div class="chart-container" id="realtimeChart"></div>
+                    </div>
+
+                    <!-- Strip Status Grid -->
+                    <div class="dashboard-chart-card col-span-3 row-span-3 animate-slide-up stagger-3">
+                        <div class="card-title"><span class="icon">▦</span> 30条剥离力实时监测</div>
+                        <div class="force-gauge-grid" id="stripGrid"></div>
+                        <div class="overall-progress mt-2">
+                            <div class="progress-label">
+                                <span class="label">总进度</span>
+                                <span class="value" id="progressPercent">0%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressBar" style="width:0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Force Bar Chart -->
+                    <div class="dashboard-chart-card col-span-6 row-span-2 animate-slide-up stagger-4">
+                        <div class="card-title"><span class="icon">▮</span> 条带剥离力对比</div>
+                        <div class="chart-container" id="forceBarChart"></div>
+                    </div>
+
+                    <!-- Force Distribution -->
+                    <div class="dashboard-chart-card col-span-3 row-span-2 animate-slide-up stagger-5">
+                        <div class="card-title"><span class="icon">◔</span> 剥离力分布</div>
+                        <div class="chart-container" id="forceDistChart"></div>
+                    </div>
+
+                    <!-- Recent Activity -->
+                    <div class="dashboard-chart-card col-span-3 row-span-2 animate-slide-up stagger-6">
+                        <div class="card-title"><span class="icon">◷</span> 系统状态</div>
+                        <div style="padding:0.5rem 0;">
+                            <div class="param-card mb-1">
+                                <div class="param-label">管道直径</div>
+                                <div class="param-value">1000 mm</div>
+                            </div>
+                            <div class="param-card mb-1">
+                                <div class="param-label">防腐层宽度</div>
+                                <div class="param-value">600 mm</div>
+                            </div>
+                            <div class="param-card mb-1">
+                                <div class="param-label">条带数量</div>
+                                <div class="param-value">30 × 20mm</div>
+                            </div>
+                            <div class="param-card">
+                                <div class="param-label">预估拉力</div>
+                                <div class="param-value">30,000 N</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/charts.js"></script>
+    <script src="/js/pipe-visual.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Nav.init();
+
+        let pollTimer = null;
+        let activeTestId = null;
+        const forceHistory = {};
+
+        function updateClock() {
+            document.getElementById('currentTime').textContent =
+                new Date().toLocaleString('zh-CN');
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function initStripGrid() {
+            const grid = document.getElementById('stripGrid');
+            let html = '';
+            for (let i = 1; i <= 30; i++) {
+                html += `<div class="force-gauge-cell" id="gauge-${i}">
+                    <div class="gauge-label">#${i}</div>
+                    <div class="gauge-value" id="gv-${i}">0</div>
+                    <div class="gauge-unit">N</div>
+                </div>`;
+            }
+            grid.innerHTML = html;
+        }
+
+        Charts.realtimeForceChart('realtimeChart', 30);
+        Charts.forceBarChart('forceBarChart',
+            Array.from({length:30}, (_, i) => `#${i+1}`),
+            new Array(30).fill(0)
+        );
+
+        PipeVisual.init('pipeCanvas', 30);
+        initStripGrid();
+
+        async function findActiveTest() {
+            try {
+                const res = await API.get('/tests?status=running&per_page=1');
+                if (res.tests && res.tests.length > 0) {
+                    activeTestId = res.tests[0].id;
+                    document.getElementById('dashTestNum').textContent = res.tests[0].test_number;
+                    document.getElementById('dashProjectName').textContent =
+                        res.tests[0].project_name || '管道防腐层剥离控制系统';
+                    document.getElementById('runningStatus').className = 'badge badge-running';
+                    document.getElementById('runningStatus').textContent = '运行中';
+                    startPolling();
+                } else {
+                    const res2 = await API.get('/tests?status=completed&per_page=1');
+                    if (res2.tests && res2.tests.length > 0) {
+                        activeTestId = res2.tests[0].id;
+                        document.getElementById('dashTestNum').textContent = res2.tests[0].test_number;
+                        document.getElementById('runningStatus').className = 'badge badge-completed';
+                        document.getElementById('runningStatus').textContent = '已完成';
+                        pollOnce();
+                    }
+                }
+            } catch (e) {
+                console.error('findActiveTest:', e);
+            }
+        }
+
+        function startPolling() {
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = setInterval(pollOnce, CONFIG.POLLING_INTERVAL);
+            pollOnce();
+        }
+
+        async function pollOnce() {
+            if (!activeTestId) return;
+            try {
+                const res = await API.get(`/realtime_poll?test_id=${activeTestId}`);
+                updateDashboard(res);
+            } catch (e) {
+                console.error('poll:', e);
+            }
+        }
+
+        function updateDashboard(data) {
+            if (!data) return;
+
+            // Stats
+            const stats = data.stats || {};
+            document.getElementById('statAvgForce').innerHTML =
+                `${Utils.formatNumber(stats.avg_force, 1)}<span class="stat-unit"> N</span>`;
+            document.getElementById('statMaxForce').innerHTML =
+                `${Utils.formatNumber(stats.max_force, 1)}<span class="stat-unit"> N</span>`;
+            document.getElementById('statActiveStrips').innerHTML =
+                `${stats.active_strips || 0}<span class="stat-unit"> /30</span>`;
+            document.getElementById('statTotalForce').innerHTML =
+                `${Utils.formatNumber(stats.total_force, 0)}<span class="stat-unit"> N</span>`;
+
+            // Progress
+            const progress = data.progress || 0;
+            document.getElementById('dashAngle').textContent =
+                `${Utils.formatNumber(data.current_angle, 1)}°`;
+            document.getElementById('dashProgress').textContent =
+                `${Utils.formatNumber(progress, 1)}%`;
+            document.getElementById('progressPercent').textContent =
+                `${Utils.formatNumber(progress, 1)}%`;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+
+            PipeVisual.updateData(data.latest_data, progress);
+
+            // Strip grid
+            const forces = new Array(30).fill(0);
+            if (data.latest_data) {
+                data.latest_data.forEach(d => {
+                    const idx = d.strip_number - 1;
+                    const f = parseFloat(d.force_value);
+                    forces[idx] = f;
+                    const cell = document.getElementById(`gauge-${d.strip_number}`);
+                    const valEl = document.getElementById(`gv-${d.strip_number}`);
+                    if (valEl) valEl.textContent = f.toFixed(0);
+                    if (cell) {
+                        cell.className = 'force-gauge-cell' + (f > 0 ? ' active' : '');
+                        if (f > 1500) cell.classList.add('warning');
+                    }
+                });
+            }
+
+            // Force bar chart
+            Charts.update('forceBarChart', {
+                series: [{
+                    data: forces.map((v, i) => ({
+                        value: v,
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: CHART_THEME.color[i % CHART_THEME.color.length] },
+                                { offset: 1, color: 'rgba(0,0,0,0.3)' }
+                            ])
+                        }
+                    }))
+                }]
+            });
+
+            // Realtime line chart - build from recent history
+            if (data.recent_history && data.recent_history.length > 0) {
+                const byStrip = {};
+                const angles = new Set();
+
+                data.recent_history.forEach(d => {
+                    const sn = d.strip_number;
+                    const angle = parseFloat(d.position_angle).toFixed(1);
+                    if (!byStrip[sn]) byStrip[sn] = [];
+                    byStrip[sn].push({ angle, force: parseFloat(d.force_value) });
+                    angles.add(angle);
+                });
+
+                const sortedAngles = [...angles].sort((a, b) => parseFloat(a) - parseFloat(b));
+                const series = [];
+                for (let i = 1; i <= 30; i++) {
+                    const stripPoints = byStrip[i] || [];
+                    series.push({
+                        data: stripPoints.map(p => p.force)
+                    });
+                }
+
+                Charts.update('realtimeChart', {
+                    xAxis: { data: sortedAngles },
+                    series: series.map((s, i) => ({
+                        ...s,
+                        name: `条带${i + 1}`,
+                        type: 'line',
+                        smooth: true,
+                        symbol: 'none',
+                        lineStyle: { width: 1.5 }
+                    }))
+                });
+            }
+
+            // Status
+            if (data.is_running) {
+                document.getElementById('runningStatus').className = 'badge badge-running';
+                document.getElementById('runningStatus').textContent = '运行中';
+            } else if (data.test && data.test.status === 'completed') {
+                document.getElementById('runningStatus').className = 'badge badge-completed';
+                document.getElementById('runningStatus').textContent = '已完成';
+                if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+            }
+        }
+
+        findActiveTest();
+    </script>
+</body>
+</html>

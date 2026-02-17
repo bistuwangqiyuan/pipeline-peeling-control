@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>试验控制 - 管道防腐层剥离控制系统</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/forms.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/animations.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar"></aside>
+        <main class="main-content">
+            <div class="page-header">
+                <h1>🎛 试验控制面板</h1>
+                <div class="header-actions">
+                    <span id="testStatus" class="badge badge-pending">未启动</span>
+                </div>
+            </div>
+            <div class="page-body">
+                <!-- Control Section -->
+                <div class="grid grid-2 mb-2">
+                    <!-- Left: Config -->
+                    <div class="card animate-fade-in-up">
+                        <div class="card-header">
+                            <div class="card-title"><span class="icon">⚙</span> 试验配置</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">选择项目</label>
+                            <select class="form-select" id="projectSelect">
+                                <option value="">请先选择项目</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">选择/创建试验</label>
+                            <select class="form-select" id="testSelect">
+                                <option value="">请先选择项目</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">试验编号</label>
+                                <input type="text" class="form-input" id="testNumber" placeholder="例: TEST-2026-001">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">操作员</label>
+                                <input type="text" class="form-input" id="operator" placeholder="操作员姓名">
+                            </div>
+                        </div>
+                        <div class="form-row-3">
+                            <div class="form-group">
+                                <label class="form-label">环境温度 (°C)</label>
+                                <input type="number" class="form-input" id="ambientTemp" placeholder="25" step="0.1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">管道温度 (°C)</label>
+                                <input type="number" class="form-input" id="pipeTemp" placeholder="25" step="0.1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">湿度 (%)</label>
+                                <input type="number" class="form-input" id="humidity" placeholder="60" step="0.1">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">备注</label>
+                            <textarea class="form-textarea" id="testNotes" rows="2" placeholder="试验备注信息"></textarea>
+                        </div>
+                        <button class="btn btn-secondary" onclick="createTest()">创建新试验</button>
+                    </div>
+
+                    <!-- Right: Controls -->
+                    <div class="card animate-fade-in-up stagger-2">
+                        <div class="card-header">
+                            <div class="card-title"><span class="icon">▶</span> 操作控制</div>
+                        </div>
+                        <div class="control-buttons mb-3">
+                            <button class="btn btn-success btn-lg" id="btnStart" onclick="controlTest('start')">
+                                ▶ 启动试验
+                            </button>
+                            <button class="btn btn-warning btn-lg" id="btnStop" onclick="controlTest('stop')" disabled>
+                                ■ 停止试验
+                            </button>
+                            <button class="btn emergency-btn btn-lg" id="btnAbort" onclick="controlTest('abort')" disabled>
+                                ⚠ 紧急中止
+                            </button>
+                        </div>
+
+                        <!-- Progress -->
+                        <div class="overall-progress mb-2">
+                            <div class="progress-label">
+                                <span class="label">剥离进度</span>
+                                <span class="value" id="ctrlProgress">0%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="ctrlProgressBar" style="width:0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Mini Stats -->
+                        <div class="grid grid-2 gap-1">
+                            <div class="param-card">
+                                <div class="param-label">当前角度</div>
+                                <div class="param-value" id="ctrlAngle">0°</div>
+                            </div>
+                            <div class="param-card">
+                                <div class="param-label">平均剥离力</div>
+                                <div class="param-value" id="ctrlAvgForce">0 N</div>
+                            </div>
+                            <div class="param-card">
+                                <div class="param-label">最大剥离力</div>
+                                <div class="param-value" id="ctrlMaxForce">0 N</div>
+                            </div>
+                            <div class="param-card">
+                                <div class="param-label">活动条带</div>
+                                <div class="param-value" id="ctrlActiveStrips">0/30</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 30-Strip Monitor -->
+                <div class="card animate-fade-in-up stagger-3 mb-2">
+                    <div class="card-header">
+                        <div class="card-title"><span class="icon">▦</span> 30条剥离力实时监测</div>
+                    </div>
+                    <div class="force-gauge-grid" id="ctrlStripGrid"></div>
+                </div>
+
+                <!-- Live Chart -->
+                <div class="card animate-fade-in-up stagger-4">
+                    <div class="card-header">
+                        <div class="card-title"><span class="icon">〰</span> 实时剥离力曲线</div>
+                    </div>
+                    <div class="chart-container" id="ctrlChart" style="min-height:350px;"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/charts.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Nav.init();
+
+        let activeTestId = null;
+        let pollTimer = null;
+
+        function initStripGrid() {
+            const grid = document.getElementById('ctrlStripGrid');
+            let html = '';
+            for (let i = 1; i <= 30; i++) {
+                html += `<div class="force-gauge-cell" id="ctrl-gauge-${i}">
+                    <div class="gauge-label">#${i}</div>
+                    <div class="gauge-value" id="ctrl-gv-${i}">0</div>
+                    <div class="gauge-unit">N</div>
+                </div>`;
+            }
+            grid.innerHTML = html;
+        }
+        initStripGrid();
+
+        Charts.realtimeForceChart('ctrlChart', 30);
+
+        async function loadProjects() {
+            try {
+                const res = await API.get('/projects?per_page=100');
+                const select = document.getElementById('projectSelect');
+                select.innerHTML = '<option value="">请选择项目</option>';
+                (res.projects || []).forEach(p => {
+                    select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+                });
+            } catch (e) {
+                Utils.showToast('加载项目失败: ' + e.message, 'error');
+            }
+        }
+
+        document.getElementById('projectSelect').addEventListener('change', async function() {
+            const pid = this.value;
+            const testSelect = document.getElementById('testSelect');
+            if (!pid) {
+                testSelect.innerHTML = '<option value="">请先选择项目</option>';
+                return;
+            }
+            try {
+                const res = await API.get(`/tests?project_id=${pid}&per_page=100`);
+                testSelect.innerHTML = '<option value="">选择已有试验或创建新试验</option>';
+                (res.tests || []).forEach(t => {
+                    testSelect.innerHTML += `<option value="${t.id}">${t.test_number} (${STATUS_LABELS[t.status] || t.status})</option>`;
+                });
+            } catch (e) {
+                Utils.showToast('加载试验失败', 'error');
+            }
+        });
+
+        document.getElementById('testSelect').addEventListener('change', function() {
+            activeTestId = this.value || null;
+            if (activeTestId) {
+                updateTestInfo();
+            }
+        });
+
+        async function updateTestInfo() {
+            if (!activeTestId) return;
+            try {
+                const res = await API.get(`/test_detail?id=${activeTestId}`);
+                const test = res.test;
+                document.getElementById('testNumber').value = test.test_number || '';
+                document.getElementById('operator').value = test.operator || '';
+                updateControlState(test.status);
+
+                if (test.status === 'running') {
+                    startPolling();
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function updateControlState(status) {
+            const btnStart = document.getElementById('btnStart');
+            const btnStop = document.getElementById('btnStop');
+            const btnAbort = document.getElementById('btnAbort');
+            const statusEl = document.getElementById('testStatus');
+
+            if (status === 'running') {
+                btnStart.disabled = true;
+                btnStop.disabled = false;
+                btnAbort.disabled = false;
+                statusEl.className = 'badge badge-running';
+                statusEl.textContent = '运行中';
+            } else if (status === 'completed') {
+                btnStart.disabled = true;
+                btnStop.disabled = true;
+                btnAbort.disabled = true;
+                statusEl.className = 'badge badge-completed';
+                statusEl.textContent = '已完成';
+            } else {
+                btnStart.disabled = !activeTestId;
+                btnStop.disabled = true;
+                btnAbort.disabled = true;
+                statusEl.className = 'badge badge-pending';
+                statusEl.textContent = STATUS_LABELS[status] || '待执行';
+            }
+        }
+
+        async function createTest() {
+            const pid = document.getElementById('projectSelect').value;
+            if (!pid) { Utils.showToast('请先选择项目', 'warning'); return; }
+
+            const testNumber = document.getElementById('testNumber').value.trim();
+            if (!testNumber) { Utils.showToast('请输入试验编号', 'warning'); return; }
+
+            try {
+                const res = await API.post('/tests', {
+                    project_id: parseInt(pid),
+                    test_number: testNumber,
+                    operator: document.getElementById('operator').value.trim(),
+                    ambient_temp: parseFloat(document.getElementById('ambientTemp').value) || null,
+                    pipe_temp: parseFloat(document.getElementById('pipeTemp').value) || null,
+                    humidity: parseFloat(document.getElementById('humidity').value) || null,
+                    notes: document.getElementById('testNotes').value.trim()
+                });
+
+                activeTestId = res.test.id;
+                Utils.showToast('试验创建成功', 'success');
+                updateControlState('pending');
+
+                // Refresh test list
+                document.getElementById('projectSelect').dispatchEvent(new Event('change'));
+            } catch (e) {
+                Utils.showToast('创建失败: ' + e.message, 'error');
+            }
+        }
+
+        async function controlTest(action) {
+            if (!activeTestId) { Utils.showToast('请先选择试验', 'warning'); return; }
+
+            if (action === 'abort' && !Utils.confirm('确定要紧急中止试验吗？')) return;
+
+            try {
+                const res = await API.post('/test_start', {
+                    test_id: parseInt(activeTestId),
+                    action: action
+                });
+                Utils.showToast(res.message, 'success');
+                updateControlState(res.status);
+
+                if (action === 'start') {
+                    startPolling();
+                } else {
+                    stopPolling();
+                }
+            } catch (e) {
+                Utils.showToast('操作失败: ' + e.message, 'error');
+            }
+        }
+
+        function startPolling() {
+            stopPolling();
+            pollTimer = setInterval(pollData, CONFIG.POLLING_INTERVAL);
+            pollData();
+        }
+
+        function stopPolling() {
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        }
+
+        async function pollData() {
+            if (!activeTestId) return;
+            try {
+                const res = await API.get(`/realtime_poll?test_id=${activeTestId}`);
+                updateControlPanel(res);
+            } catch (e) {
+                console.error('poll error:', e);
+            }
+        }
+
+        function updateControlPanel(data) {
+            if (!data) return;
+            const stats = data.stats || {};
+            const progress = data.progress || 0;
+
+            document.getElementById('ctrlProgress').textContent = `${Utils.formatNumber(progress, 1)}%`;
+            document.getElementById('ctrlProgressBar').style.width = `${progress}%`;
+            document.getElementById('ctrlAngle').textContent = `${Utils.formatNumber(data.current_angle, 1)}°`;
+            document.getElementById('ctrlAvgForce').textContent = `${Utils.formatNumber(stats.avg_force, 1)} N`;
+            document.getElementById('ctrlMaxForce').textContent = `${Utils.formatNumber(stats.max_force, 1)} N`;
+            document.getElementById('ctrlActiveStrips').textContent = `${stats.active_strips || 0}/30`;
+
+            if (data.latest_data) {
+                data.latest_data.forEach(d => {
+                    const f = parseFloat(d.force_value);
+                    const valEl = document.getElementById(`ctrl-gv-${d.strip_number}`);
+                    const cell = document.getElementById(`ctrl-gauge-${d.strip_number}`);
+                    if (valEl) valEl.textContent = f.toFixed(0);
+                    if (cell) {
+                        cell.className = 'force-gauge-cell' + (f > 0 ? ' active' : '');
+                    }
+                });
+            }
+
+            if (data.recent_history && data.recent_history.length > 0) {
+                const byStrip = {};
+                const angles = new Set();
+                data.recent_history.forEach(d => {
+                    const sn = d.strip_number;
+                    if (!byStrip[sn]) byStrip[sn] = [];
+                    const angle = parseFloat(d.position_angle).toFixed(1);
+                    byStrip[sn].push({ angle, force: parseFloat(d.force_value) });
+                    angles.add(angle);
+                });
+                const sortedAngles = [...angles].sort((a, b) => parseFloat(a) - parseFloat(b));
+                const series = [];
+                for (let i = 1; i <= 30; i++) {
+                    series.push({
+                        name: `条带${i}`,
+                        type: 'line',
+                        smooth: true,
+                        symbol: 'none',
+                        lineStyle: { width: 1.5 },
+                        data: (byStrip[i] || []).map(p => p.force)
+                    });
+                }
+                Charts.update('ctrlChart', { xAxis: { data: sortedAngles }, series });
+            }
+
+            if (!data.is_running && data.test && data.test.status !== 'running') {
+                updateControlState(data.test.status);
+                stopPolling();
+            }
+        }
+
+        loadProjects();
+
+        // Check for already running test
+        (async () => {
+            try {
+                const res = await API.get('/tests?status=running&per_page=1');
+                if (res.tests && res.tests.length > 0) {
+                    activeTestId = res.tests[0].id;
+                    updateControlState('running');
+                    startPolling();
+                    Utils.showToast('检测到正在运行的试验', 'info');
+                }
+            } catch (e) {}
+        })();
+    </script>
+</body>
+</html>

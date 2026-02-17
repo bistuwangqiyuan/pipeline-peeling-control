@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目管理 - 管道防腐层剥离控制系统</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/forms.css">
+    <link rel="stylesheet" href="/css/animations.css">
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar"></aside>
+        <main class="main-content">
+            <div class="page-header">
+                <h1>📁 项目管理</h1>
+                <div class="header-actions">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" class="form-input" id="searchInput" placeholder="搜索项目..." oninput="debouncedSearch()">
+                    </div>
+                    <button class="btn btn-primary" onclick="Utils.showModal('projectModal')">+ 新建项目</button>
+                </div>
+            </div>
+            <div class="page-body">
+                <div class="card animate-fade-in">
+                    <div style="overflow-x:auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>项目名称</th>
+                                    <th>管道直径</th>
+                                    <th>防腐层宽度</th>
+                                    <th>条带数</th>
+                                    <th>预估拉力</th>
+                                    <th>位置</th>
+                                    <th>状态</th>
+                                    <th>创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="projectsBody">
+                                <tr><td colspan="10" class="text-center text-dim p-3">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="pagination"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div class="modal-overlay" id="projectModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">新建项目</h3>
+                <button class="modal-close" onclick="Utils.hideModal('projectModal')">✕</button>
+            </div>
+            <form id="projectForm" onsubmit="return saveProject(event)">
+                <input type="hidden" id="editId">
+                <div class="form-group">
+                    <label class="form-label">项目名称 *</label>
+                    <input type="text" class="form-input" id="pName" required placeholder="例: XX管线防腐层剥离试验">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">项目描述</label>
+                    <textarea class="form-textarea" id="pDesc" rows="2" placeholder="项目描述信息"></textarea>
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">管道直径 (mm)</label>
+                        <input type="number" class="form-input" id="pDiameter" value="1000" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">防腐层宽度 (mm)</label>
+                        <input type="number" class="form-input" id="pLayerWidth" value="600" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">防腐层厚度 (mm)</label>
+                        <input type="number" class="form-input" id="pLayerThickness" value="1.0" step="0.0001">
+                    </div>
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">条带数</label>
+                        <input type="number" class="form-input" id="pStripCount" value="30">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">条带宽度 (mm)</label>
+                        <input type="number" class="form-input" id="pStripWidth" value="20" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">预估拉力 (N)</label>
+                        <input type="number" class="form-input" id="pForce" value="30000" step="0.01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">位置</label>
+                    <input type="text" class="form-input" id="pLocation" placeholder="管道位置信息">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="Utils.hideModal('projectModal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/nav.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Nav.init();
+
+        let currentPage = 1;
+        const debouncedSearch = Utils.debounce(() => { currentPage = 1; loadProjects(); }, 300);
+
+        async function loadProjects() {
+            const search = document.getElementById('searchInput').value.trim();
+            try {
+                const params = `?page=${currentPage}&per_page=15&search=${encodeURIComponent(search)}`;
+                const res = await API.get('/projects' + params);
+                renderProjects(res.projects || [], res.total || 0, res.page, res.per_page);
+            } catch (e) {
+                Utils.showToast('加载失败: ' + e.message, 'error');
+            }
+        }
+
+        function renderProjects(projects, total, page, perPage) {
+            const tbody = document.getElementById('projectsBody');
+            if (projects.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center text-dim p-3">暂无项目数据</td></tr>';
+                return;
+            }
+            tbody.innerHTML = projects.map(p => `
+                <tr class="animate-fade-in">
+                    <td class="text-mono">${p.id}</td>
+                    <td><strong>${Utils.escapeHtml(p.name)}</strong></td>
+                    <td class="text-mono">${p.pipe_diameter} mm</td>
+                    <td class="text-mono">${p.layer_width} mm</td>
+                    <td class="text-mono">${p.strip_count}</td>
+                    <td class="text-mono">${p.estimated_force} N</td>
+                    <td>${Utils.escapeHtml(p.location || '-')}</td>
+                    <td>${Utils.statusBadge(p.status)}</td>
+                    <td class="text-dim">${Utils.formatDateShort(p.created_at)}</td>
+                    <td>
+                        <button class="btn btn-ghost btn-sm" onclick="editProject(${p.id})">编辑</button>
+                        <button class="btn btn-ghost btn-sm text-danger" onclick="deleteProject(${p.id})">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            renderPagination(total, page, perPage);
+        }
+
+        function renderPagination(total, page, perPage) {
+            const pages = Math.ceil(total / perPage);
+            const container = document.getElementById('pagination');
+            if (pages <= 1) { container.innerHTML = ''; return; }
+            let html = `<button ${page <= 1 ? 'disabled' : ''} onclick="goPage(${page-1})">‹</button>`;
+            for (let i = 1; i <= pages; i++) {
+                html += `<button class="${i === page ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+            }
+            html += `<button ${page >= pages ? 'disabled' : ''} onclick="goPage(${page+1})">›</button>`;
+            container.innerHTML = html;
+        }
+
+        function goPage(p) { currentPage = p; loadProjects(); }
+
+        async function saveProject(e) {
+            e.preventDefault();
+            const editId = document.getElementById('editId').value;
+            const data = {
+                name: document.getElementById('pName').value.trim(),
+                description: document.getElementById('pDesc').value.trim(),
+                pipe_diameter: parseFloat(document.getElementById('pDiameter').value),
+                layer_width: parseFloat(document.getElementById('pLayerWidth').value),
+                layer_thickness: parseFloat(document.getElementById('pLayerThickness').value),
+                strip_count: parseInt(document.getElementById('pStripCount').value),
+                strip_width: parseFloat(document.getElementById('pStripWidth').value),
+                estimated_force: parseFloat(document.getElementById('pForce').value),
+                location: document.getElementById('pLocation').value.trim()
+            };
+            try {
+                if (editId) {
+                    await API.put(`/project_detail?id=${editId}`, data);
+                    Utils.showToast('项目已更新', 'success');
+                } else {
+                    await API.post('/projects', data);
+                    Utils.showToast('项目已创建', 'success');
+                }
+                Utils.hideModal('projectModal');
+                loadProjects();
+            } catch (e) {
+                Utils.showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        async function editProject(id) {
+            try {
+                const res = await API.get(`/project_detail?id=${id}`);
+                const p = res.project;
+                document.getElementById('editId').value = p.id;
+                document.getElementById('modalTitle').textContent = '编辑项目';
+                document.getElementById('pName').value = p.name;
+                document.getElementById('pDesc').value = p.description || '';
+                document.getElementById('pDiameter').value = p.pipe_diameter;
+                document.getElementById('pLayerWidth').value = p.layer_width;
+                document.getElementById('pLayerThickness').value = p.layer_thickness;
+                document.getElementById('pStripCount').value = p.strip_count;
+                document.getElementById('pStripWidth').value = p.strip_width;
+                document.getElementById('pForce').value = p.estimated_force;
+                document.getElementById('pLocation').value = p.location || '';
+                Utils.showModal('projectModal');
+            } catch (e) {
+                Utils.showToast('加载项目失败', 'error');
+            }
+        }
+
+        async function deleteProject(id) {
+            if (!Utils.confirm('确定要删除此项目及其所有试验数据？')) return;
+            try {
+                await API.delete(`/project_detail?id=${id}`);
+                Utils.showToast('项目已删除', 'success');
+                loadProjects();
+            } catch (e) {
+                Utils.showToast('删除失败: ' + e.message, 'error');
+            }
+        }
+
+        // Reset modal on open new
+        document.querySelector('[onclick="Utils.showModal(\'projectModal\')"]').addEventListener('click', () => {
+            document.getElementById('editId').value = '';
+            document.getElementById('modalTitle').textContent = '新建项目';
+            document.getElementById('projectForm').reset();
+            document.getElementById('pDiameter').value = 1000;
+            document.getElementById('pLayerWidth').value = 600;
+            document.getElementById('pLayerThickness').value = 1.0;
+            document.getElementById('pStripCount').value = 30;
+            document.getElementById('pStripWidth').value = 20;
+            document.getElementById('pForce').value = 30000;
+        });
+
+        loadProjects();
+    </script>
+</body>
+</html>

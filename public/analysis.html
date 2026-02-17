@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据分析 - 管道防腐层剥离控制系统</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/forms.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/animations.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar"></aside>
+        <main class="main-content">
+            <div class="page-header">
+                <h1>📈 数据分析</h1>
+                <div class="header-actions">
+                    <select class="form-select" id="projectFilter" style="width:200px;" onchange="loadTests()">
+                        <option value="">选择项目</option>
+                    </select>
+                    <select class="form-select" id="testFilter" style="width:200px;" onchange="loadAnalysis()">
+                        <option value="">选择试验</option>
+                    </select>
+                    <button class="btn btn-secondary btn-sm" id="exportBtn" onclick="exportData()" disabled>导出CSV</button>
+                </div>
+            </div>
+            <div class="page-body">
+                <div id="noData" class="card animate-fade-in">
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <p>请选择项目和试验以查看分析数据</p>
+                    </div>
+                </div>
+
+                <div id="analysisContent" style="display:none;">
+                    <!-- Overall Stats -->
+                    <div class="grid grid-4 mb-2">
+                        <div class="stat-card accent-cyan animate-fade-in-up stagger-1">
+                            <div class="stat-label">整体平均力</div>
+                            <div class="stat-value" id="anaAvg">-<span class="stat-unit"> N</span></div>
+                        </div>
+                        <div class="stat-card accent-blue animate-fade-in-up stagger-2">
+                            <div class="stat-label">整体最大力</div>
+                            <div class="stat-value" id="anaMax">-<span class="stat-unit"> N</span></div>
+                        </div>
+                        <div class="stat-card accent-success animate-fade-in-up stagger-3">
+                            <div class="stat-label">整体最小力</div>
+                            <div class="stat-value" id="anaMin">-<span class="stat-unit"> N</span></div>
+                        </div>
+                        <div class="stat-card accent-warning animate-fade-in-up stagger-4">
+                            <div class="stat-label">数据点数</div>
+                            <div class="stat-value" id="anaPoints">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row 1 -->
+                    <div class="grid grid-2 mb-2">
+                        <div class="dashboard-chart-card animate-slide-up stagger-1">
+                            <div class="card-title"><span class="icon">〰</span> 剥离力-角度曲线</div>
+                            <div class="chart-container" id="chartForceAngle" style="min-height:380px;"></div>
+                        </div>
+                        <div class="dashboard-chart-card animate-slide-up stagger-2">
+                            <div class="card-title"><span class="icon">▮</span> 30条平均剥离力对比</div>
+                            <div class="chart-container" id="chartForceBar" style="min-height:380px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row 2 -->
+                    <div class="grid grid-2 mb-2">
+                        <div class="dashboard-chart-card animate-slide-up stagger-3">
+                            <div class="card-title"><span class="icon">▤</span> 剥离力分布直方图</div>
+                            <div class="chart-container" id="chartDistribution" style="min-height:350px;"></div>
+                        </div>
+                        <div class="dashboard-chart-card animate-slide-up stagger-4">
+                            <div class="card-title"><span class="icon">◔</span> 合格率分析</div>
+                            <div class="chart-container" id="chartPie" style="min-height:350px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Box Chart -->
+                    <div class="dashboard-chart-card mb-2 animate-slide-up stagger-5">
+                        <div class="card-title"><span class="icon">▥</span> 条带力统计箱线图</div>
+                        <div class="chart-container" id="chartBox" style="min-height:350px;"></div>
+                    </div>
+
+                    <!-- Statistics Table -->
+                    <div class="card animate-slide-up stagger-6">
+                        <div class="card-header">
+                            <div class="card-title"><span class="icon">▤</span> 条带统计明细</div>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>条带#</th>
+                                        <th>平均力 (N)</th>
+                                        <th>最大力 (N)</th>
+                                        <th>最小力 (N)</th>
+                                        <th>标准差 (N)</th>
+                                        <th>总位移 (mm)</th>
+                                        <th>数据点</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="statsTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/charts.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Nav.init();
+
+        async function loadProjects() {
+            try {
+                const res = await API.get('/projects?per_page=100');
+                const select = document.getElementById('projectFilter');
+                select.innerHTML = '<option value="">选择项目</option>';
+                (res.projects || []).forEach(p => {
+                    select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+                });
+            } catch (e) {}
+        }
+
+        async function loadTests() {
+            const pid = document.getElementById('projectFilter').value;
+            const select = document.getElementById('testFilter');
+            select.innerHTML = '<option value="">选择试验</option>';
+            if (!pid) return;
+            try {
+                const res = await API.get(`/tests?project_id=${pid}&per_page=100`);
+                (res.tests || []).forEach(t => {
+                    select.innerHTML += `<option value="${t.id}">${t.test_number} (${STATUS_LABELS[t.status] || t.status})</option>`;
+                });
+            } catch (e) {}
+        }
+
+        async function loadAnalysis() {
+            const testId = document.getElementById('testFilter').value;
+            if (!testId) {
+                document.getElementById('noData').style.display = '';
+                document.getElementById('analysisContent').style.display = 'none';
+                return;
+            }
+
+            try {
+                const res = await API.get(`/data_analysis?test_id=${testId}`);
+                document.getElementById('noData').style.display = 'none';
+                document.getElementById('analysisContent').style.display = '';
+                document.getElementById('exportBtn').disabled = false;
+                renderAnalysis(res);
+            } catch (e) {
+                Utils.showToast('加载分析数据失败: ' + e.message, 'error');
+            }
+        }
+
+        function renderAnalysis(data) {
+            const os = data.overall_stats || {};
+            document.getElementById('anaAvg').innerHTML = `${Utils.formatNumber(os.overall_avg, 1)}<span class="stat-unit"> N</span>`;
+            document.getElementById('anaMax').innerHTML = `${Utils.formatNumber(os.overall_max, 1)}<span class="stat-unit"> N</span>`;
+            document.getElementById('anaMin').innerHTML = `${Utils.formatNumber(os.overall_min, 1)}<span class="stat-unit"> N</span>`;
+            document.getElementById('anaPoints').textContent = os.total_points || '-';
+
+            // Force vs Angle
+            if (data.force_vs_angle && data.force_vs_angle.length > 0) {
+                Charts.forceVsAngleChart('chartForceAngle', data.force_vs_angle);
+            }
+
+            // Bar chart
+            const stripStats = data.strip_stats || [];
+            if (stripStats.length > 0) {
+                const labels = stripStats.map(s => `#${s.strip_number}`);
+                const values = stripStats.map(s => parseFloat(s.avg_force));
+                Charts.forceBarChart('chartForceBar', labels, values);
+            }
+
+            // Distribution
+            if (data.force_distribution && data.force_distribution.length > 0) {
+                Charts.forceDistributionChart('chartDistribution', data.force_distribution);
+            }
+
+            // Pie
+            const pass = stripStats.filter(s => parseFloat(s.avg_force) > CONFIG.FORCE_ALARM_LOW).length;
+            const fail = stripStats.length - pass;
+            Charts.passfailPieChart('chartPie', pass, fail);
+
+            // Box chart
+            if (stripStats.length > 0) {
+                const boxData = stripStats.map(s => [
+                    parseFloat(s.min_force),
+                    parseFloat(s.avg_force) - parseFloat(s.std_force || 0),
+                    parseFloat(s.avg_force),
+                    parseFloat(s.avg_force) + parseFloat(s.std_force || 0),
+                    parseFloat(s.max_force)
+                ]);
+
+                Charts.init('chartBox', {
+                    color: ['#00d4ff'],
+                    title: { text: '条带力统计', left: 'center', textStyle: { fontSize: 13, color: '#e0e8ff' } },
+                    xAxis: {
+                        type: 'category',
+                        data: stripStats.map(s => `#${s.strip_number}`),
+                        ...CHART_THEME.xAxis
+                    },
+                    yAxis: { type: 'value', ...CHART_THEME.yAxis, name: '力 (N)' },
+                    series: [{
+                        type: 'boxplot',
+                        data: boxData,
+                        itemStyle: {
+                            color: 'rgba(0, 212, 255, 0.15)',
+                            borderColor: '#00d4ff'
+                        }
+                    }]
+                });
+            }
+
+            // Table
+            const tbody = document.getElementById('statsTableBody');
+            tbody.innerHTML = stripStats.map(s => `
+                <tr>
+                    <td class="text-mono font-bold">#${s.strip_number}</td>
+                    <td class="text-mono">${Utils.formatNumber(s.avg_force, 2)}</td>
+                    <td class="text-mono text-cyan">${Utils.formatNumber(s.max_force, 2)}</td>
+                    <td class="text-mono">${Utils.formatNumber(s.min_force, 2)}</td>
+                    <td class="text-mono">${Utils.formatNumber(s.std_force, 2)}</td>
+                    <td class="text-mono">${Utils.formatNumber(s.total_displacement, 2)}</td>
+                    <td class="text-mono text-dim">${s.data_points}</td>
+                </tr>
+            `).join('');
+        }
+
+        function exportData() {
+            const testId = document.getElementById('testFilter').value;
+            if (!testId) return;
+            window.open(`/api/data_export?test_id=${testId}&format=csv`, '_blank');
+        }
+
+        loadProjects();
+    </script>
+</body>
+</html>

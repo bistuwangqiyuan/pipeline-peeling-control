@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>试验报告 - 管道防腐层剥离控制系统</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/forms.css">
+    <link rel="stylesheet" href="/css/animations.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        @media print {
+            .sidebar, .page-header, .no-print { display: none !important; }
+            .main-content { margin-left: 0 !important; }
+            .page-body { padding: 0 !important; }
+            body { background: white; color: #333; }
+            .card { border: 1px solid #ddd; background: white; }
+            .stat-card { background: #f9f9f9; border: 1px solid #ddd; }
+            .stat-card .stat-value { color: #333; text-shadow: none; }
+            .stat-card .stat-label { color: #666; }
+            .report-header { background: white !important; border: none !important; }
+            .report-header h2 { color: #333 !important; text-shadow: none !important; }
+            .data-table th { background: #f0f0f0; color: #333; }
+            .data-table td { color: #333; border-color: #ddd; }
+        }
+        .report-header {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .report-header h2 {
+            font-size: 1.5rem;
+            color: var(--accent-cyan);
+            text-shadow: var(--text-glow-cyan);
+            margin-bottom: 0.5rem;
+        }
+        .report-header .report-meta {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        .report-section {
+            margin-bottom: 1.5rem;
+        }
+        .report-section h3 {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar"></aside>
+        <main class="main-content">
+            <div class="page-header no-print">
+                <h1>📋 试验报告</h1>
+                <div class="header-actions">
+                    <select class="form-select" id="projectFilter" style="width:200px;" onchange="loadTests()">
+                        <option value="">选择项目</option>
+                    </select>
+                    <select class="form-select" id="testFilter" style="width:200px;" onchange="generateReport()">
+                        <option value="">选择试验</option>
+                    </select>
+                    <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 打印报告</button>
+                    <button class="btn btn-secondary btn-sm" onclick="exportCSV()">导出CSV</button>
+                </div>
+            </div>
+            <div class="page-body">
+                <div id="noData" class="card animate-fade-in">
+                    <div class="empty-state">
+                        <div class="empty-icon">📋</div>
+                        <p>请选择已完成的试验以生成报告</p>
+                    </div>
+                </div>
+
+                <div id="reportContent" style="display:none;">
+                    <div class="report-header">
+                        <h2>管道防腐层剥离试验报告</h2>
+                        <div class="report-meta" id="reportMeta"></div>
+                    </div>
+
+                    <div class="report-section">
+                        <h3>一、试验基本信息</h3>
+                        <div class="grid grid-3 mb-2">
+                            <div class="param-card"><div class="param-label">试验编号</div><div class="param-value" id="rTestNum">-</div></div>
+                            <div class="param-card"><div class="param-label">项目名称</div><div class="param-value" id="rProject">-</div></div>
+                            <div class="param-card"><div class="param-label">操作员</div><div class="param-value" id="rOperator">-</div></div>
+                            <div class="param-card"><div class="param-label">开始时间</div><div class="param-value" id="rStart" style="font-size:0.85rem;">-</div></div>
+                            <div class="param-card"><div class="param-label">结束时间</div><div class="param-value" id="rEnd" style="font-size:0.85rem;">-</div></div>
+                            <div class="param-card"><div class="param-label">试验状态</div><div class="param-value" id="rStatus">-</div></div>
+                        </div>
+                        <div class="grid grid-3">
+                            <div class="param-card"><div class="param-label">环境温度</div><div class="param-value" id="rAmbTemp">-</div></div>
+                            <div class="param-card"><div class="param-label">管道温度</div><div class="param-value" id="rPipeTemp">-</div></div>
+                            <div class="param-card"><div class="param-label">湿度</div><div class="param-value" id="rHumidity">-</div></div>
+                        </div>
+                    </div>
+
+                    <div class="report-section">
+                        <h3>二、总体统计结果</h3>
+                        <div class="grid grid-4 mb-2">
+                            <div class="stat-card accent-cyan"><div class="stat-label">平均剥离力</div><div class="stat-value" id="rAvg">-<span class="stat-unit"> N</span></div></div>
+                            <div class="stat-card accent-blue"><div class="stat-label">最大剥离力</div><div class="stat-value" id="rMax">-<span class="stat-unit"> N</span></div></div>
+                            <div class="stat-card accent-success"><div class="stat-label">最小剥离力</div><div class="stat-value" id="rMin">-<span class="stat-unit"> N</span></div></div>
+                            <div class="stat-card accent-warning"><div class="stat-label">标准差</div><div class="stat-value" id="rStd">-<span class="stat-unit"> N</span></div></div>
+                        </div>
+                    </div>
+
+                    <div class="report-section">
+                        <h3>三、剥离力-角度曲线</h3>
+                        <div class="card"><div class="chart-container" id="rChartAngle" style="min-height:400px;"></div></div>
+                    </div>
+
+                    <div class="report-section">
+                        <h3>四、各条带剥离力对比</h3>
+                        <div class="card"><div class="chart-container" id="rChartBar" style="min-height:350px;"></div></div>
+                    </div>
+
+                    <div class="report-section">
+                        <h3>五、各条带统计数据</h3>
+                        <div class="card" style="overflow-x:auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>条带编号</th>
+                                        <th>平均力 (N)</th>
+                                        <th>最大力 (N)</th>
+                                        <th>最小力 (N)</th>
+                                        <th>标准差 (N)</th>
+                                        <th>总位移 (mm)</th>
+                                        <th>结论</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="report-section">
+                        <h3>六、结论</h3>
+                        <div class="card p-2" id="rConclusion" style="font-size:0.9rem;line-height:1.8;"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/charts.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Nav.init();
+
+        async function loadProjects() {
+            try {
+                const res = await API.get('/projects?per_page=100');
+                const select = document.getElementById('projectFilter');
+                select.innerHTML = '<option value="">选择项目</option>';
+                (res.projects || []).forEach(p => {
+                    select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+                });
+            } catch (e) {}
+        }
+
+        async function loadTests() {
+            const pid = document.getElementById('projectFilter').value;
+            const select = document.getElementById('testFilter');
+            select.innerHTML = '<option value="">选择试验</option>';
+            if (!pid) return;
+            try {
+                const res = await API.get(`/tests?project_id=${pid}&per_page=100`);
+                (res.tests || []).forEach(t => {
+                    select.innerHTML += `<option value="${t.id}">${t.test_number} (${STATUS_LABELS[t.status] || t.status})</option>`;
+                });
+            } catch (e) {}
+        }
+
+        async function generateReport() {
+            const testId = document.getElementById('testFilter').value;
+            if (!testId) {
+                document.getElementById('noData').style.display = '';
+                document.getElementById('reportContent').style.display = 'none';
+                return;
+            }
+
+            try {
+                const res = await API.get(`/data_analysis?test_id=${testId}`);
+                document.getElementById('noData').style.display = 'none';
+                document.getElementById('reportContent').style.display = '';
+                renderReport(res);
+            } catch (e) {
+                Utils.showToast('生成报告失败: ' + e.message, 'error');
+            }
+        }
+
+        function renderReport(data) {
+            const test = data.test || {};
+            const os = data.overall_stats || {};
+            const stats = data.strip_stats || [];
+
+            document.getElementById('reportMeta').textContent =
+                `项目: ${test.project_name || '-'} | 试验编号: ${test.test_number || '-'} | 生成时间: ${new Date().toLocaleString('zh-CN')}`;
+
+            document.getElementById('rTestNum').textContent = test.test_number || '-';
+            document.getElementById('rProject').textContent = test.project_name || '-';
+            document.getElementById('rOperator').textContent = test.operator || '-';
+            document.getElementById('rStart').textContent = Utils.formatDate(test.start_time);
+            document.getElementById('rEnd').textContent = Utils.formatDate(test.end_time);
+            document.getElementById('rStatus').textContent = STATUS_LABELS[test.status] || test.status;
+            document.getElementById('rAmbTemp').textContent = test.ambient_temp ? `${test.ambient_temp}°C` : '-';
+            document.getElementById('rPipeTemp').textContent = test.pipe_temp ? `${test.pipe_temp}°C` : '-';
+            document.getElementById('rHumidity').textContent = test.humidity ? `${test.humidity}%` : '-';
+
+            document.getElementById('rAvg').innerHTML = `${Utils.formatNumber(os.overall_avg, 1)}<span class="stat-unit"> N</span>`;
+            document.getElementById('rMax').innerHTML = `${Utils.formatNumber(os.overall_max, 1)}<span class="stat-unit"> N</span>`;
+            document.getElementById('rMin').innerHTML = `${Utils.formatNumber(os.overall_min, 1)}<span class="stat-unit"> N</span>`;
+            document.getElementById('rStd').innerHTML = `${Utils.formatNumber(os.overall_std, 1)}<span class="stat-unit"> N</span>`;
+
+            if (data.force_vs_angle && data.force_vs_angle.length > 0) {
+                Charts.forceVsAngleChart('rChartAngle', data.force_vs_angle);
+            }
+
+            if (stats.length > 0) {
+                Charts.forceBarChart('rChartBar',
+                    stats.map(s => `#${s.strip_number}`),
+                    stats.map(s => parseFloat(s.avg_force))
+                );
+            }
+
+            const tbody = document.getElementById('rTableBody');
+            tbody.innerHTML = stats.map(s => {
+                const pass = parseFloat(s.avg_force) > CONFIG.FORCE_ALARM_LOW;
+                return `<tr>
+                    <td class="text-mono font-bold">#${s.strip_number}</td>
+                    <td class="text-mono">${Utils.formatNumber(s.avg_force, 2)}</td>
+                    <td class="text-mono">${Utils.formatNumber(s.max_force, 2)}</td>
+                    <td class="text-mono">${Utils.formatNumber(s.min_force, 2)}</td>
+                    <td class="text-mono">${Utils.formatNumber(s.std_force, 2)}</td>
+                    <td class="text-mono">${Utils.formatNumber(s.total_displacement, 2)}</td>
+                    <td><span class="badge ${pass ? 'badge-completed' : 'badge-aborted'}">${pass ? '合格' : '不合格'}</span></td>
+                </tr>`;
+            }).join('');
+
+            const passCount = stats.filter(s => parseFloat(s.avg_force) > CONFIG.FORCE_ALARM_LOW).length;
+            const rate = stats.length > 0 ? (passCount / stats.length * 100).toFixed(1) : 0;
+            document.getElementById('rConclusion').innerHTML = `
+                <p>本次剥离试验共测试 <strong>${stats.length}</strong> 条防腐层条带，管道圆周剥离角度覆盖 360°。</p>
+                <p>整体平均剥离力为 <strong class="text-cyan">${Utils.formatNumber(os.overall_avg, 1)} N</strong>，
+                   最大剥离力为 <strong>${Utils.formatNumber(os.overall_max, 1)} N</strong>，
+                   标准差为 <strong>${Utils.formatNumber(os.overall_std, 1)} N</strong>。</p>
+                <p>合格条带数: <strong class="text-success">${passCount}</strong> / ${stats.length}，
+                   合格率: <strong class="text-cyan">${rate}%</strong>。</p>
+                <p>数据记录总点数: <strong>${os.total_points}</strong>。</p>
+            `;
+        }
+
+        function exportCSV() {
+            const testId = document.getElementById('testFilter').value;
+            if (!testId) return;
+            window.open(`/api/data_export?test_id=${testId}&format=csv`, '_blank');
+        }
+
+        loadProjects();
+    </script>
+</body>
+</html>

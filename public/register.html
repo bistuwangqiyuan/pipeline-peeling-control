@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - 管道防腐层剥离控制系统</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/forms.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/animations.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card" style="max-width:460px;">
+            <div class="login-logo">
+                <div class="logo-icon">⚙</div>
+                <h2>用户注册</h2>
+                <p>创建您的账号以使用系统</p>
+            </div>
+
+            <form class="login-form" id="registerForm" onsubmit="return handleRegister(event)">
+                <div class="form-group">
+                    <label class="form-label">用户名 *</label>
+                    <input type="text" class="form-input" id="username" placeholder="2-50个字符" required minlength="2" maxlength="50">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">密码 *</label>
+                        <input type="password" class="form-input" id="password" placeholder="至少3个字符" required minlength="3">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">确认密码 *</label>
+                        <input type="password" class="form-input" id="password2" placeholder="再次输入密码" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">手机号</label>
+                    <input type="tel" class="form-input" id="phone" placeholder="选填">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">授权码</label>
+                    <input type="text" class="form-input" id="authCode" placeholder="选填 · 输入授权码可获得数据修改权限">
+                    <div class="form-hint">如有授权码请填写，获得数据编辑权限</div>
+                </div>
+                <div id="regError" class="form-error" style="display:none; margin-bottom:0.75rem;"></div>
+                <button type="submit" class="btn btn-primary btn-lg" id="regBtn">
+                    注 册
+                </button>
+            </form>
+
+            <div class="login-footer">
+                已有账号？<a href="/index.html">返回登录</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script>
+        if (Auth.isLoggedIn()) {
+            window.location.href = PAGES.DASHBOARD;
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const btn = document.getElementById('regBtn');
+            const errEl = document.getElementById('regError');
+            errEl.style.display = 'none';
+
+            const password = document.getElementById('password').value;
+            const password2 = document.getElementById('password2').value;
+
+            if (password !== password2) {
+                errEl.textContent = '两次输入的密码不一致';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '注册中...';
+
+            try {
+                await Auth.register({
+                    username: document.getElementById('username').value.trim(),
+                    password: password,
+                    phone: document.getElementById('phone').value.trim(),
+                    auth_code: document.getElementById('authCode').value.trim()
+                });
+                window.location.href = PAGES.DASHBOARD;
+            } catch (err) {
+                errEl.textContent = err.message;
+                errEl.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '注 册';
+            }
+        }
+    </script>
+</body>
+</html>

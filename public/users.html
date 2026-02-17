@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 - 管道防腐层剥离控制系统</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/forms.css">
+    <link rel="stylesheet" href="/css/animations.css">
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar"></aside>
+        <main class="main-content">
+            <div class="page-header">
+                <h1>👥 用户管理</h1>
+            </div>
+            <div class="page-body">
+                <div class="card animate-fade-in">
+                    <div style="overflow-x:auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>用户名</th>
+                                    <th>手机号</th>
+                                    <th>角色</th>
+                                    <th>授权码</th>
+                                    <th>状态</th>
+                                    <th>创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersBody">
+                                <tr><td colspan="8" class="text-center text-dim p-3">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>编辑用户</h3>
+                <button class="modal-close" onclick="Utils.hideModal('userModal')">✕</button>
+            </div>
+            <form id="userForm" onsubmit="return saveUser(event)">
+                <input type="hidden" id="editUserId">
+                <div class="form-group">
+                    <label class="form-label">用户名</label>
+                    <input type="text" class="form-input" id="euUsername" disabled>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">角色</label>
+                        <select class="form-select" id="euRole">
+                            <option value="admin">管理员</option>
+                            <option value="user">普通用户</option>
+                            <option value="test">测试用户</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">状态</label>
+                        <select class="form-select" id="euActive">
+                            <option value="true">启用</option>
+                            <option value="false">禁用</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">手机号</label>
+                    <input type="text" class="form-input" id="euPhone" placeholder="选填">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">授权码</label>
+                    <input type="text" class="form-input" id="euAuthCode" placeholder="选填">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">重置密码</label>
+                    <input type="password" class="form-input" id="euPassword" placeholder="留空则不修改密码">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="Utils.hideModal('userModal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/nav.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        if (!Auth.requireAdmin()) {
+            window.location.href = PAGES.DASHBOARD;
+            throw new Error('Not admin');
+        }
+        Nav.init();
+
+        async function loadUsers() {
+            try {
+                const res = await API.get('/admin_users?per_page=100');
+                renderUsers(res.users || []);
+            } catch (e) {
+                Utils.showToast('加载用户失败: ' + e.message, 'error');
+            }
+        }
+
+        function renderUsers(users) {
+            const tbody = document.getElementById('usersBody');
+            tbody.innerHTML = users.map(u => `
+                <tr class="animate-fade-in">
+                    <td class="text-mono">${u.id}</td>
+                    <td><strong>${Utils.escapeHtml(u.username)}</strong></td>
+                    <td>${u.phone || '-'}</td>
+                    <td>${Utils.roleBadge(u.role)}</td>
+                    <td class="text-mono text-dim">${u.auth_code || '-'}</td>
+                    <td><span class="badge ${u.is_active ? 'badge-completed' : 'badge-aborted'}">${u.is_active ? '启用' : '禁用'}</span></td>
+                    <td class="text-dim">${Utils.formatDateShort(u.created_at)}</td>
+                    <td>
+                        <button class="btn btn-ghost btn-sm" onclick="editUser(${u.id}, '${Utils.escapeHtml(u.username)}', '${u.role}', ${u.is_active}, '${u.phone || ''}', '${u.auth_code || ''}')">编辑</button>
+                        <button class="btn btn-ghost btn-sm text-danger" onclick="deleteUser(${u.id}, '${Utils.escapeHtml(u.username)}')">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function editUser(id, username, role, active, phone, authCode) {
+            document.getElementById('editUserId').value = id;
+            document.getElementById('euUsername').value = username;
+            document.getElementById('euRole').value = role;
+            document.getElementById('euActive').value = String(active);
+            document.getElementById('euPhone').value = phone;
+            document.getElementById('euAuthCode').value = authCode;
+            document.getElementById('euPassword').value = '';
+            Utils.showModal('userModal');
+        }
+
+        async function saveUser(e) {
+            e.preventDefault();
+            const id = document.getElementById('editUserId').value;
+            const data = {
+                role: document.getElementById('euRole').value,
+                is_active: document.getElementById('euActive').value === 'true',
+                phone: document.getElementById('euPhone').value.trim(),
+                auth_code: document.getElementById('euAuthCode').value.trim()
+            };
+            const pw = document.getElementById('euPassword').value;
+            if (pw) data.password = pw;
+
+            try {
+                await API.put(`/admin_users?id=${id}`, data);
+                Utils.showToast('用户已更新', 'success');
+                Utils.hideModal('userModal');
+                loadUsers();
+            } catch (e) {
+                Utils.showToast('更新失败: ' + e.message, 'error');
+            }
+        }
+
+        async function deleteUser(id, username) {
+            if (!Utils.confirm(`确定要删除用户 "${username}" 吗？`)) return;
+            try {
+                await API.delete(`/admin_users?id=${id}`);
+                Utils.showToast('用户已删除', 'success');
+                loadUsers();
+            } catch (e) {
+                Utils.showToast('删除失败: ' + e.message, 'error');
+            }
+        }
+
+        loadUsers();
+    </script>
+</body>
+</html>
