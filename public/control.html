@@ -213,7 +213,7 @@
         async function updateTestInfo() {
             if (!activeTestId) return;
             try {
-                const res = await API.get(`/test_detail?id=${activeTestId}`);
+                const res = await API.get(`/test_ops?id=${activeTestId}`);
                 const test = res.test;
                 document.getElementById('testNumber').value = test.test_number || '';
                 document.getElementById('operator').value = test.operator || '';
@@ -289,7 +289,7 @@
             if (action === 'abort' && !Utils.confirm('确定要紧急中止试验吗？')) return;
 
             try {
-                const res = await API.post('/test_start', {
+                const res = await API.post('/test_ops', {
                     test_id: parseInt(activeTestId),
                     action: action
                 });

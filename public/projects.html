@@ -191,7 +191,7 @@
             };
             try {
                 if (editId) {
-                    await API.put(`/project_detail?id=${editId}`, data);
+                    await API.put(`/projects?id=${editId}`, data);
                     Utils.showToast('项目已更新', 'success');
                 } else {
                     await API.post('/projects', data);
@@ -206,7 +206,7 @@
 
         async function editProject(id) {
             try {
-                const res = await API.get(`/project_detail?id=${id}`);
+                const res = await API.get(`/projects?id=${id}`);
                 const p = res.project;
                 document.getElementById('editId').value = p.id;
                 document.getElementById('modalTitle').textContent = '编辑项目';
@@ -228,7 +228,7 @@
         async function deleteProject(id) {
             if (!Utils.confirm('确定要删除此项目及其所有试验数据？')) return;
             try {
-                await API.delete(`/project_detail?id=${id}`);
+                await API.delete(`/projects?id=${id}`);
                 Utils.showToast('项目已删除', 'success');
                 loadProjects();
             } catch (e) {

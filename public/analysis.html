@@ -159,7 +159,7 @@
             }
 
             try {
-                const res = await API.get(`/data_analysis?test_id=${testId}`);
+                const res = await API.get(`/data?action=analysis&test_id=${testId}`);
                 document.getElementById('noData').style.display = 'none';
                 document.getElementById('analysisContent').style.display = '';
                 document.getElementById('exportBtn').disabled = false;
@@ -247,7 +247,7 @@
         function exportData() {
             const testId = document.getElementById('testFilter').value;
             if (!testId) return;
-            window.open(`/api/data_export?test_id=${testId}&format=csv`, '_blank');
+            window.open(`/api/data?action=export&test_id=${testId}`, '_blank');
         }
 
         loadProjects();

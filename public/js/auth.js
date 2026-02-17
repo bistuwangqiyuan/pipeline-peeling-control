@@ -49,7 +49,7 @@ const Auth = {
     },
 
     async login(username, password) {
-        const res = await API.post('/auth_login', { username, password });
+        const res = await API.post('/auth?action=login', { username, password });
         if (res.token) {
             this.setAuth(res.token, res.user);
         }
@@ -57,7 +57,7 @@ const Auth = {
     },
 
     async register(data) {
-        const res = await API.post('/auth_register', data);
+        const res = await API.post('/auth?action=register', data);
         if (res.token) {
             this.setAuth(res.token, res.user);
         }
@@ -66,7 +66,7 @@ const Auth = {
 
     async fetchMe() {
         try {
-            const res = await API.get('/auth_me');
+            const res = await API.get('/auth?action=me');
             if (res.user) {
                 localStorage.setItem(CONFIG.USER_KEY, JSON.stringify(res.user));
             }

@@ -109,7 +109,7 @@
 
         async function loadUsers() {
             try {
-                const res = await API.get('/admin_users?per_page=100');
+                const res = await API.get('/admin?action=users&per_page=100');
                 renderUsers(res.users || []);
             } catch (e) {
                 Utils.showToast('加载用户失败: ' + e.message, 'error');
@@ -159,7 +159,7 @@
             if (pw) data.password = pw;
 
             try {
-                await API.put(`/admin_users?id=${id}`, data);
+                await API.put(`/admin?id=${id}`, data);
                 Utils.showToast('用户已更新', 'success');
                 Utils.hideModal('userModal');
                 loadUsers();
@@ -171,7 +171,7 @@
         async function deleteUser(id, username) {
             if (!Utils.confirm(`确定要删除用户 "${username}" 吗？`)) return;
             try {
-                await API.delete(`/admin_users?id=${id}`);
+                await API.delete(`/admin?id=${id}`);
                 Utils.showToast('用户已删除', 'success');
                 loadUsers();
             } catch (e) {

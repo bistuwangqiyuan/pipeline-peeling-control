@@ -156,8 +156,8 @@
         async function loadAuditLog() {
             const action = document.getElementById('auditFilter').value;
             try {
-                let url = `/admin_audit?page=${auditPage}&per_page=30`;
-                if (action) url += `&action=${action}`;
+                let url = `/admin?action=audit&page=${auditPage}&per_page=30`;
+                if (action) url += `&action_filter=${action}`;
                 const res = await API.get(url);
                 renderAuditLog(res.logs || [], res.total, res.page, res.per_page);
             } catch (e) {

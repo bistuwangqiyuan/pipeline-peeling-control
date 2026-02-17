@@ -13,42 +13,44 @@ class handler(BaseHTTPRequestHandler):
         options_response(self)
 
     def do_GET(self):
+        params = get_query_params(self)
+        action = params.get('action', 'users')
+        if action == 'users':
+            self._list_users(params)
+        elif action == 'audit':
+            self._audit_log(params)
+        else:
+            error_response(self, 'Unknown action')
+
+    def do_PUT(self):
+        self._update_user()
+
+    def do_DELETE(self):
+        self._delete_user()
+
+    def _list_users(self, params):
         try:
             payload = get_user_from_request(self.headers)
-            if not payload:
-                error_response(self, '未授权访问', 401)
-                return
-
-            if payload.get('role') != 'admin':
+            if not payload or payload.get('role') != 'admin':
                 error_response(self, '需要管理员权限', 403)
                 return
 
-            params = get_query_params(self)
             page = int(params.get('page', '1'))
             per_page = int(params.get('per_page', '50'))
             offset = (page - 1) * per_page
 
             count_result = query("SELECT COUNT(*) as total FROM users", fetchone=True)
-
             users = query(
                 """SELECT id, username, phone, role, auth_code, is_active, created_at, updated_at
-                   FROM users
-                   ORDER BY created_at DESC
-                   LIMIT %s OFFSET %s""",
-                (per_page, offset),
-                fetchall=True
+                   FROM users ORDER BY created_at DESC LIMIT %s OFFSET %s""",
+                (per_page, offset), fetchall=True
             )
 
-            json_response(self, {
-                'users': users,
-                'total': count_result['total'],
-                'page': page,
-                'per_page': per_page
-            })
+            json_response(self, {'users': users, 'total': count_result['total'], 'page': page})
         except Exception as e:
             error_response(self, str(e), 500)
 
-    def do_PUT(self):
+    def _update_user(self):
         try:
             payload = get_user_from_request(self.headers)
             if not payload or payload.get('role') != 'admin':
@@ -65,18 +67,13 @@ class handler(BaseHTTPRequestHandler):
             fields = []
             values = []
 
-            if 'role' in body:
-                fields.append("role = %s")
-                values.append(body['role'])
+            for key in ['role', 'phone', 'auth_code']:
+                if key in body:
+                    fields.append(f"{key} = %s")
+                    values.append(body[key])
             if 'is_active' in body:
                 fields.append("is_active = %s")
                 values.append(body['is_active'])
-            if 'phone' in body:
-                fields.append("phone = %s")
-                values.append(body['phone'])
-            if 'auth_code' in body:
-                fields.append("auth_code = %s")
-                values.append(body['auth_code'])
             if 'password' in body and body['password']:
                 fields.append("password_hash = %s")
                 values.append(hash_password(body['password']))
@@ -87,11 +84,7 @@ class handler(BaseHTTPRequestHandler):
 
             fields.append("updated_at = CURRENT_TIMESTAMP")
             values.append(user_id)
-
-            execute(
-                f"UPDATE users SET {', '.join(fields)} WHERE id = %s",
-                values
-            )
+            execute(f"UPDATE users SET {', '.join(fields)} WHERE id = %s", values)
 
             query(
                 "INSERT INTO audit_log (user_id, action, resource_type, resource_id, details) VALUES (%s, %s, %s, %s, %s)",
@@ -101,14 +94,13 @@ class handler(BaseHTTPRequestHandler):
 
             user = query(
                 "SELECT id, username, phone, role, auth_code, is_active FROM users WHERE id = %s",
-                (user_id,),
-                fetchone=True
+                (user_id,), fetchone=True
             )
             json_response(self, {'user': user})
         except Exception as e:
             error_response(self, str(e), 500)
 
-    def do_DELETE(self):
+    def _delete_user(self):
         try:
             payload = get_user_from_request(self.headers)
             if not payload or payload.get('role') != 'admin':
@@ -133,5 +125,43 @@ class handler(BaseHTTPRequestHandler):
             )
 
             json_response(self, {'message': '用户已删除'})
+        except Exception as e:
+            error_response(self, str(e), 500)
+
+    def _audit_log(self, params):
+        try:
+            payload = get_user_from_request(self.headers)
+            if not payload:
+                error_response(self, '未授权访问', 401)
+                return
+
+            page = int(params.get('page', '1'))
+            per_page = int(params.get('per_page', '50'))
+            offset = (page - 1) * per_page
+            action_filter = params.get('action_filter')
+
+            where_clauses = []
+            where_params = []
+
+            if action_filter:
+                where_clauses.append("a.action = %s")
+                where_params.append(action_filter)
+
+            where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+            count_result = query(
+                f"SELECT COUNT(*) as total FROM audit_log a WHERE {where_sql}",
+                where_params, fetchone=True
+            )
+
+            logs = query(
+                f"""SELECT a.*, u.username FROM audit_log a
+                    LEFT JOIN users u ON a.user_id = u.id
+                    WHERE {where_sql}
+                    ORDER BY a.created_at DESC LIMIT %s OFFSET %s""",
+                where_params + [per_page, offset], fetchall=True
+            )
+
+            json_response(self, {'logs': logs, 'total': count_result['total'], 'page': page})
         except Exception as e:
             error_response(self, str(e), 500)
