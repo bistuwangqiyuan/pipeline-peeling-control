@@ -5,10 +5,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from api._lib.db import query, execute
 from api._lib.response import json_response, error_response, options_response, get_query_params
-from api._lib.simulator import generate_simulation_batch, compute_test_summary
-
-
-POSITION_STEP_MM = 5.0
+from api._lib.simulator import reveal, playback_step, compute_test_summary
 
 
 class handler(BaseHTTPRequestHandler):
@@ -28,24 +25,30 @@ class handler(BaseHTTPRequestHandler):
                 error_response(self, '试验不存在', 404)
                 return
 
-            total_mm = float(test['total_positions'] or 600)
+            # 回放推进（仅在运行中）：按位置游标揭示真实数据点，绝不生成 mock
+            template = test['profiles']
+            if isinstance(template, str):
+                template = json.loads(template) if template else None
 
-            # 推进仿真（仅在运行中）
+            total_mm = float(test['total_positions'] or 0) or (
+                float(template['max_pos']) if template and template.get('max_pos') else 600.0)
+
             if test['is_running']:
                 current = float(test['current_position'] or 0)
-                profiles = test['profiles']
-                if isinstance(profiles, str):
-                    profiles = json.loads(profiles)
 
-                if current >= total_mm:
+                if not template or 'replay' not in template:
+                    # 缺少真实回放模板，直接结束以避免空跑
+                    execute("""UPDATE tests SET is_running=FALSE, status='completed',
+                               end_time=NOW() WHERE id=%s""", (test_id,))
+                    test = query("SELECT * FROM tests WHERE id = %s", (test_id,), fetchone=True)
+                elif current >= total_mm:
                     execute("""UPDATE tests SET is_running=FALSE, status='completed',
                                end_time=NOW() WHERE id=%s""", (test_id,))
                     compute_test_summary(int(test_id))
                     test = query("SELECT * FROM tests WHERE id = %s", (test_id,), fetchone=True)
-                elif profiles:
-                    speed = float(test['peel_speed'] or 10)
-                    generate_simulation_batch(int(test_id), profiles, current, total_mm, speed)
-                    new_pos = current + POSITION_STEP_MM
+                else:
+                    new_pos = min(total_mm, current + playback_step(total_mm))
+                    reveal(int(test_id), template, current, new_pos)
                     execute("UPDATE tests SET current_position=%s WHERE id=%s",
                             (new_pos, test_id))
 
@@ -66,6 +69,10 @@ class handler(BaseHTTPRequestHandler):
                    ORDER BY id DESC LIMIT 600""",
                 (test_id,), fetchall=True
             )
+
+            # 回放模板体积较大，避免随每次轮询回传
+            if isinstance(test, dict):
+                test.pop('profiles', None)
 
             cur_pos = float(test['current_position'] or 0)
             progress = min(100.0, cur_pos / total_mm * 100.0) if total_mm else 0.0

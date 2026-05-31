@@ -6,10 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from api._lib.db import query, execute
 from api._lib.auth import get_user_from_request, can_modify
 from api._lib.response import json_response, error_response, options_response, get_body, get_query_params
-from api._lib.simulator import generate_strip_profiles, compute_test_summary
-
-
-DEFAULT_TOTAL_MM = 600.0
+from api._lib.simulator import build_replay_template, compute_test_summary
 
 
 class handler(BaseHTTPRequestHandler):
@@ -111,10 +108,15 @@ class handler(BaseHTTPRequestHandler):
                     error_response(self, '试验已在运行中')
                     return
 
-                n_strips = int(body.get('n_strips', 30))
-                total_mm = float(body.get('total_mm', DEFAULT_TOTAL_MM))
+                # 构建真实数据回放模板（捕获自身或代表性真实试样曲线，零 mock）
+                template = build_replay_template(int(test_id))
+                if not template:
+                    error_response(self, '无可用真实数据用于回放，请先初始化数据库种子')
+                    return
+
                 speed = float(body.get('peel_speed', test.get('peel_speed') or 10))
-                profiles = generate_strip_profiles(n_strips, total_mm)
+                n_strips = template['n_strips']
+                total_mm = template['max_pos']
 
                 execute("DELETE FROM data_points WHERE test_id = %s", (test_id,))
                 execute(
@@ -122,7 +124,7 @@ class handler(BaseHTTPRequestHandler):
                        start_time=NOW(), end_time=NULL, current_position=0,
                        n_strips=%s, total_positions=%s, peel_speed=%s, profiles=%s,
                        max_force=NULL, pass_rate=NULL WHERE id=%s""",
-                    (n_strips, int(total_mm), speed, json.dumps(profiles), test_id)
+                    (n_strips, int(total_mm), speed, json.dumps(template), test_id)
                 )
                 execute("UPDATE projects SET status='in_progress', updated_at=NOW() WHERE id=%s",
                         (test['project_id'],))
@@ -130,8 +132,9 @@ class handler(BaseHTTPRequestHandler):
                     "INSERT INTO audit_log (user_id, action, resource_type, resource_id) VALUES (%s,%s,%s,%s)",
                     (payload['user_id'], 'start_test', 'test', int(test_id))
                 )
-                json_response(self, {'message': '试验已启动', 'status': 'running',
-                                     'n_strips': n_strips, 'total_mm': total_mm})
+                json_response(self, {'message': '试验已启动（真实数据回放）', 'status': 'running',
+                                     'n_strips': n_strips, 'total_mm': total_mm,
+                                     'source_test_id': template.get('source_test_id')})
 
             elif action == 'stop':
                 execute(

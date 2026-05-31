@@ -1,80 +1,116 @@
-"""剥离力实时仿真模型（对齐真实数据集特征）。
+"""实时大屏数据源：真实数据回放（replay）。
 
-物理依据（论文 5.7 + 真实数据集）：
-    - 力值量程 0–1000 N，良好粘接区呈 ~96 N 平台；
-    - 缺陷区（弱粘 / 气泡 / 脱粘）出现显著力值下凹，最低可至 0 N；
-    - 起剥瞬态存在上升段，剥离沿条带长度方向以 1 mm 为采样间隔推进。
+设计原则（应需求"取消大屏自动 mock 数据增长，以实际数据驱动"）：
+    - 不再生成任何随机/合成（mock）力值。
+    - 试验启动时，从已入库的真实试样数据（data_points，来源于真实 CSV 种子）
+      捕获逐条带"力-位"序列，存入 tests.profiles 作为回放模板。
+    - 实时轮询时，仅按位置游标"揭示"模板中的真实数据点（写入运行中试验的
+      data_points），不做任何插值/生成。
 
-仿真按"位置(mm)"推进，为每条带生成一条含平台 + 随机缺陷下凹 + 噪声的
-力-位曲线，写入 data_points 表，整体形态与 P1016R-02F 等真实样本一致。
+数据来源：
+    - 若该试验自身已有真实数据点（例如对种子真实试样重新启动），回放其自身曲线；
+    - 否则选取数据点最多的真实完成试验作为代表性回放源（如 P1016R-02F）。
 """
-import math
-import random
 import datetime
-from .db import get_connection
+
 import psycopg2.extras
 
+from .db import get_connection, query
 
-PLATFORM_MIN = 82.0          # 良好粘接平台下限
-PLATFORM_MAX = 98.0          # 良好粘接平台上限
-RAMP_MM = 20.0               # 起剥上升段长度
-NOISE_RATIO = 0.03           # 噪声比例
-FORCE_SENSOR_RANGE = 1000.0  # 传感器量程
-
-
-def generate_strip_profiles(strip_count=30, total_mm=600.0):
-    """为每条带生成剥离力剖面：平台值 + 若干缺陷下凹区间。"""
-    profiles = []
-    for i in range(strip_count):
-        platform = random.uniform(PLATFORM_MIN, PLATFORM_MAX)
-        n_defects = random.choices([0, 1, 2, 3], weights=[35, 35, 20, 10])[0]
-        defects = []
-        for _ in range(n_defects):
-            width = random.uniform(20, 120)
-            start = random.uniform(RAMP_MM, max(RAMP_MM, total_mm - width))
-            depth = random.uniform(0.4, 1.0)   # 力值下凹比例
-            defects.append({'start': start, 'end': start + width, 'depth': depth})
-        profiles.append({
-            'strip_number': i + 1,
-            'platform': round(platform, 2),
-            'defects': defects,
-        })
-    return profiles
+FORCE_SENSOR_RANGE = 1000.0   # S 型传感器量程 0–1000 N
+PASS_THRESHOLD = 70.0         # 合格阈值
+MAX_STRIPS = 30               # 大屏最多展示 30 条带
+PLAYBACK_POLLS = 100          # 完整回放所需轮询数（200ms × 100 ≈ 20s）
 
 
-def force_at(position, total_mm, profile):
-    """给定位置(mm)返回该条带剥离力(N)。"""
-    platform = profile['platform']
-    if position < RAMP_MM:
-        base = platform * (position / RAMP_MM)
-    else:
-        base = platform
-
-    factor = 1.0
-    for d in profile.get('defects', []):
-        if d['start'] <= position <= d['end']:
-            # 以半正弦形成平滑下凹
-            t = (position - d['start']) / max(1e-6, (d['end'] - d['start']))
-            dip = math.sin(t * math.pi)
-            factor = min(factor, 1.0 - d['depth'] * dip)
-
-    force = base * max(0.0, factor)
-    if force > 0:
-        force += random.gauss(0, force * NOISE_RATIO)
-    return max(0.0, min(FORCE_SENSOR_RANGE, force))
+def _fetch_series(test_id):
+    """读取某试验的逐条带真实力-位序列（按条带、位置升序）。"""
+    rows = query(
+        """SELECT strip_number, position_mm, force_value, speed
+           FROM data_points WHERE test_id = %s
+           ORDER BY strip_number, position_mm""",
+        (test_id,), fetchall=True
+    )
+    series = {}
+    for r in rows or []:
+        series.setdefault(int(r['strip_number']), []).append([
+            float(r['position_mm']),
+            float(r['force_value']),
+            float(r['speed']) if r['speed'] is not None else 10.0,
+        ])
+    return series
 
 
-def generate_simulation_batch(test_id, profiles, current_position, total_mm,
-                              speed_mm_min=10.0):
-    """在当前位置为所有条带生成一帧力-位数据并写库。"""
+def pick_source_test(exclude_test_id=None):
+    """选取数据点最多的真实试验作为回放源。"""
+    row = query(
+        """SELECT test_id, COUNT(*) AS c FROM data_points
+           WHERE (%s::int IS NULL OR test_id <> %s)
+           GROUP BY test_id ORDER BY c DESC LIMIT 1""",
+        (exclude_test_id, exclude_test_id), fetchone=True
+    )
+    return int(row['test_id']) if row else None
+
+
+def build_replay_template(test_id):
+    """构建真实数据回放模板。
+
+    返回 {'replay': {strip_str: [[pos, force, speed], ...]},
+          'max_pos': float, 'n_strips': int, 'source_test_id': int|None}
+    无可用真实数据时返回 None。
+    """
+    series = _fetch_series(test_id)
+    source = None
+    if sum(len(v) for v in series.values()) < 10:
+        src = pick_source_test(exclude_test_id=test_id)
+        if src is None:
+            return None
+        series = _fetch_series(src)
+        source = src
+
+    strips = sorted(series.keys())[:MAX_STRIPS]
+    replay = {str(s): series[s] for s in strips if series[s]}
+    if not replay:
+        return None
+
+    max_pos = 0.0
+    for s in strips:
+        if series[s]:
+            max_pos = max(max_pos, series[s][-1][0])
+
+    return {
+        'replay': replay,
+        'max_pos': round(max_pos, 2),
+        'n_strips': len(replay),
+        'source_test_id': source,
+    }
+
+
+def playback_step(max_pos):
+    """每次轮询推进的位置步长（mm）。"""
+    return max(1.0, float(max_pos) / PLAYBACK_POLLS)
+
+
+def reveal(test_id, template, old_pos, new_pos):
+    """揭示位置区间 (old_pos, new_pos] 内的真实数据点并写入运行中试验。"""
+    replay = (template or {}).get('replay', {})
     now = datetime.datetime.utcnow()
     rows = []
-    for profile in profiles:
-        f = force_at(current_position, total_mm, profile)
-        rows.append((
-            test_id, profile['strip_number'], round(current_position, 2),
-            round(f, 4), round(speed_mm_min, 2), now
-        ))
+    for s_str, pts in replay.items():
+        try:
+            s = int(s_str)
+        except (TypeError, ValueError):
+            continue
+        for p in pts:
+            pos = float(p[0])
+            force = float(p[1])
+            speed = float(p[2]) if len(p) > 2 else 10.0
+            if old_pos < pos <= new_pos:
+                rows.append((test_id, s, round(pos, 2), round(force, 4),
+                             round(speed, 2), now))
+
+    if not rows:
+        return 0
 
     conn = get_connection()
     try:
@@ -89,17 +125,17 @@ def generate_simulation_batch(test_id, profiles, current_position, total_mm,
             conn.commit()
     finally:
         conn.close()
-    return rows
+    return len(rows)
 
 
-def compute_test_summary(test_id, threshold=70.0):
+def compute_test_summary(test_id, threshold=PASS_THRESHOLD):
     """试验结束后回写整体峰值与合格率到 tests 表。"""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """SELECT MAX(force_value) AS max_force,
-                          AVG(CASE WHEN force_value >= %s THEN 1.0 ELSE 0.0 END)*100 AS pass_rate
+                          AVG(CASE WHEN force_value >= %s THEN 1.0 ELSE 0.0 END) * 100 AS pass_rate
                    FROM data_points WHERE test_id = %s""",
                 (threshold, test_id)
             )

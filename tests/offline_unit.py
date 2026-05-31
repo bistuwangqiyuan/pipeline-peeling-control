@@ -18,24 +18,77 @@ def check(name, cond, detail=""):
         failures.append(name)
 
 
-# 1) 仿真模型
+# 1) 真实数据回放引擎（无 mock 生成）
 from api._lib import simulator
 
-profiles = simulator.generate_strip_profiles(30, 600)
-check("生成30条带剖面", len(profiles) == 30)
-all_in_range = True
-platform_hit = 0
-for p in profiles:
-    for pos in range(0, 600, 5):
-        f = simulator.force_at(pos, 600, p)
-        if not (0 <= f <= simulator.FORCE_SENSOR_RANGE):
-            all_in_range = False
-        if 80 <= f <= 100:
-            platform_hit += 1
-check("力值均在 0-1000N 区间", all_in_range)
-check("存在良好粘接平台(80-100N)采样", platform_hit > 50, f"platform_hit={platform_hit}")
-ramp = simulator.force_at(0, 600, profiles[0])
-check("起剥点力值≈0(上升段)", ramp < 20, f"f(0)={ramp:.1f}")
+check("已移除 mock 生成函数 generate_simulation_batch",
+      not hasattr(simulator, 'generate_simulation_batch'))
+check("已移除随机剖面函数 generate_strip_profiles",
+      not hasattr(simulator, 'generate_strip_profiles'))
+
+# 1a) build_replay_template：用伪造的"真实"序列查询验证模板结构
+FAKE_SERIES_ROWS = []
+for s in range(1, 4):
+    for pos in (0.0, 5.0, 10.0, 15.0, 20.0):
+        FAKE_SERIES_ROWS.append({'strip_number': s, 'position_mm': pos,
+                                 'force_value': 90.0 - s + pos * 0.1, 'speed': 10.0})
+
+
+def fake_sim_query(sql, params=None, fetchone=False, fetchall=False):
+    s = ' '.join(sql.split())
+    if 'GROUP BY test_id' in s:
+        return {'test_id': 99, 'c': 15}
+    if 'ORDER BY strip_number, position_mm' in s:
+        return FAKE_SERIES_ROWS
+    return None
+
+
+simulator.query = fake_sim_query
+tpl = simulator.build_replay_template(1)
+check("生成回放模板", tpl is not None)
+check("模板含 3 条带", tpl and tpl['n_strips'] == 3, f"n_strips={tpl['n_strips'] if tpl else None}")
+check("模板 max_pos=20", tpl and abs(tpl['max_pos'] - 20.0) < 1e-6, f"max_pos={tpl['max_pos'] if tpl else None}")
+all_real = all(0 <= p[1] <= simulator.FORCE_SENSOR_RANGE
+               for pts in tpl['replay'].values() for p in pts)
+check("回放力值均在 0-1000N 区间", all_real)
+
+# 1b) reveal：仅揭示 (old,new] 区间内的真实点，且数值来自模板（非生成）
+captured = {}
+
+
+class _FakeCur:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class _FakeConn:
+    def cursor(self):
+        return _FakeCur()
+
+    def commit(self):
+        pass
+
+    def close(self):
+        pass
+
+
+simulator.get_connection = lambda: _FakeConn()
+simulator.psycopg2.extras.execute_values = lambda cur, sql, rows: captured.update(rows=rows)
+
+template = {'replay': {'1': [[0.0, 10.0, 10], [5.0, 90.0, 10], [10.0, 95.0, 10]],
+                       '2': [[0.0, 5.0, 10], [5.0, 80.0, 10], [10.0, 85.0, 10]]},
+            'max_pos': 10.0, 'n_strips': 2}
+n = simulator.reveal(7, template, 0.0, 5.0)
+rows = captured.get('rows', [])
+check("reveal 仅揭示区间(0,5]的点", n == 2 and len(rows) == 2, f"n={n}")
+revealed_forces = sorted(r[3] for r in rows)
+check("reveal 数值取自真实模板(80/90)", revealed_forces == [80.0, 90.0], f"forces={revealed_forces}")
+n2 = simulator.reveal(7, template, 5.0, 5.0)
+check("reveal 空区间不写入", n2 == 0)
+check("playback_step>0", simulator.playback_step(2786) > 0)
 
 
 # 2) Word 报告生成（monkeypatch 数据库）
