@@ -2,9 +2,9 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/**/*.py",
+      "src": "api/*.py",
       "use": "@vercel/python",
-      "config": { "includeFiles": "analysis/seed_data.json" }
+      "config": { "includeFiles": ["api/_lib/**", "analysis/seed_data.json"] }
     },
     {
       "src": "public/**",
