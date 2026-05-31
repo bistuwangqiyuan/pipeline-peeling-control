@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>项目管理 - 管道防腐层剥离控制系统</title>
+    <title>项目管理 - 管道补口剥离控制系统</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/base.css">
     <link rel="stylesheet" href="/css/layout.css">
@@ -22,7 +22,7 @@
                         <span class="search-icon">🔍</span>
                         <input type="text" class="form-input" id="searchInput" placeholder="搜索项目..." oninput="debouncedSearch()">
                     </div>
-                    <button class="btn btn-primary" onclick="Utils.showModal('projectModal')">+ 新建项目</button>
+                    <button class="btn btn-primary" id="newProjectBtn" onclick="openNew()">+ 新建项目</button>
                 </div>
             </div>
             <div class="page-body">
@@ -35,8 +35,8 @@
                                     <th>项目名称</th>
                                     <th>管道直径</th>
                                     <th>防腐层宽度</th>
-                                    <th>条带数</th>
-                                    <th>预估拉力</th>
+                                    <th>厚度</th>
+                                    <th>试验数</th>
                                     <th>位置</th>
                                     <th>状态</th>
                                     <th>创建时间</th>
@@ -54,7 +54,6 @@
         </main>
     </div>
 
-    <!-- Create/Edit Modal -->
     <div class="modal-overlay" id="projectModal">
         <div class="modal">
             <div class="modal-header">
@@ -65,7 +64,7 @@
                 <input type="hidden" id="editId">
                 <div class="form-group">
                     <label class="form-label">项目名称 *</label>
-                    <input type="text" class="form-input" id="pName" required placeholder="例: XX管线防腐层剥离试验">
+                    <input type="text" class="form-input" id="pName" required placeholder="例: 西气东输三线Φ1016补口剥离检测">
                 </div>
                 <div class="form-group">
                     <label class="form-label">项目描述</label>
@@ -74,7 +73,7 @@
                 <div class="form-row-3">
                     <div class="form-group">
                         <label class="form-label">管道直径 (mm)</label>
-                        <input type="number" class="form-input" id="pDiameter" value="1000" step="0.01">
+                        <input type="number" class="form-input" id="pDiameter" value="1016" step="0.01">
                     </div>
                     <div class="form-group">
                         <label class="form-label">防腐层宽度 (mm)</label>
@@ -85,23 +84,15 @@
                         <input type="number" class="form-input" id="pLayerThickness" value="1.0" step="0.0001">
                     </div>
                 </div>
-                <div class="form-row-3">
-                    <div class="form-group">
-                        <label class="form-label">条带数</label>
-                        <input type="number" class="form-input" id="pStripCount" value="30">
-                    </div>
+                <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">条带宽度 (mm)</label>
                         <input type="number" class="form-input" id="pStripWidth" value="20" step="0.01">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">预估拉力 (N)</label>
-                        <input type="number" class="form-input" id="pForce" value="30000" step="0.01">
+                        <label class="form-label">位置</label>
+                        <input type="text" class="form-input" id="pLocation" placeholder="管道/检测地点">
                     </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">位置</label>
-                    <input type="text" class="form-input" id="pLocation" placeholder="管道位置信息">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="Utils.hideModal('projectModal')">取消</button>
@@ -117,8 +108,9 @@
     <script src="/js/utils.js"></script>
     <script src="/js/nav.js"></script>
     <script>
-        if (!Auth.requireAuth()) throw new Error('Not authenticated');
         Nav.init();
+        const canWrite = Auth.canWrite();
+        if (!canWrite) document.getElementById('newProjectBtn').style.display = 'none';
 
         let currentPage = 1;
         const debouncedSearch = Utils.debounce(() => { currentPage = 1; loadProjects(); }, 300);
@@ -146,18 +138,19 @@
                     <td><strong>${Utils.escapeHtml(p.name)}</strong></td>
                     <td class="text-mono">${p.pipe_diameter} mm</td>
                     <td class="text-mono">${p.layer_width} mm</td>
-                    <td class="text-mono">${p.strip_count}</td>
-                    <td class="text-mono">${p.estimated_force} N</td>
+                    <td class="text-mono">${p.layer_thickness} mm</td>
+                    <td class="text-mono text-cyan">${p.test_count != null ? p.test_count : '-'}</td>
                     <td>${Utils.escapeHtml(p.location || '-')}</td>
                     <td>${Utils.statusBadge(p.status)}</td>
                     <td class="text-dim">${Utils.formatDateShort(p.created_at)}</td>
                     <td>
+                        ${canWrite ? `
                         <button class="btn btn-ghost btn-sm" onclick="editProject(${p.id})">编辑</button>
                         <button class="btn btn-ghost btn-sm text-danger" onclick="deleteProject(${p.id})">删除</button>
+                        ` : '<span class="text-dim">只读</span>'}
                     </td>
                 </tr>
             `).join('');
-
             renderPagination(total, page, perPage);
         }
 
@@ -175,8 +168,21 @@
 
         function goPage(p) { currentPage = p; loadProjects(); }
 
+        function openNew() {
+            if (!Auth.requireWrite()) return;
+            document.getElementById('editId').value = '';
+            document.getElementById('modalTitle').textContent = '新建项目';
+            document.getElementById('projectForm').reset();
+            document.getElementById('pDiameter').value = 1016;
+            document.getElementById('pLayerWidth').value = 600;
+            document.getElementById('pLayerThickness').value = 1.0;
+            document.getElementById('pStripWidth').value = 20;
+            Utils.showModal('projectModal');
+        }
+
         async function saveProject(e) {
             e.preventDefault();
+            if (!Auth.requireWrite()) return false;
             const editId = document.getElementById('editId').value;
             const data = {
                 name: document.getElementById('pName').value.trim(),
@@ -184,9 +190,7 @@
                 pipe_diameter: parseFloat(document.getElementById('pDiameter').value),
                 layer_width: parseFloat(document.getElementById('pLayerWidth').value),
                 layer_thickness: parseFloat(document.getElementById('pLayerThickness').value),
-                strip_count: parseInt(document.getElementById('pStripCount').value),
                 strip_width: parseFloat(document.getElementById('pStripWidth').value),
-                estimated_force: parseFloat(document.getElementById('pForce').value),
                 location: document.getElementById('pLocation').value.trim()
             };
             try {
@@ -202,6 +206,7 @@
             } catch (e) {
                 Utils.showToast('保存失败: ' + e.message, 'error');
             }
+            return false;
         }
 
         async function editProject(id) {
@@ -215,9 +220,7 @@
                 document.getElementById('pDiameter').value = p.pipe_diameter;
                 document.getElementById('pLayerWidth').value = p.layer_width;
                 document.getElementById('pLayerThickness').value = p.layer_thickness;
-                document.getElementById('pStripCount').value = p.strip_count;
                 document.getElementById('pStripWidth').value = p.strip_width;
-                document.getElementById('pForce').value = p.estimated_force;
                 document.getElementById('pLocation').value = p.location || '';
                 Utils.showModal('projectModal');
             } catch (e) {
@@ -226,6 +229,7 @@
         }
 
         async function deleteProject(id) {
+            if (!Auth.requireWrite()) return;
             if (!Utils.confirm('确定要删除此项目及其所有试验数据？')) return;
             try {
                 await API.delete(`/projects?id=${id}`);
@@ -235,19 +239,6 @@
                 Utils.showToast('删除失败: ' + e.message, 'error');
             }
         }
-
-        // Reset modal on open new
-        document.querySelector('[onclick="Utils.showModal(\'projectModal\')"]').addEventListener('click', () => {
-            document.getElementById('editId').value = '';
-            document.getElementById('modalTitle').textContent = '新建项目';
-            document.getElementById('projectForm').reset();
-            document.getElementById('pDiameter').value = 1000;
-            document.getElementById('pLayerWidth').value = 600;
-            document.getElementById('pLayerThickness').value = 1.0;
-            document.getElementById('pStripCount').value = 30;
-            document.getElementById('pStripWidth').value = 20;
-            document.getElementById('pForce').value = 30000;
-        });
 
         loadProjects();
     </script>

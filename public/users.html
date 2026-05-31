@@ -63,14 +63,14 @@
                         <select class="form-select" id="euRole">
                             <option value="admin">管理员</option>
                             <option value="user">普通用户</option>
-                            <option value="test">测试用户</option>
+                            <option value="guest">游客</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">状态</label>
                         <select class="form-select" id="euActive">
-                            <option value="true">启用</option>
-                            <option value="false">禁用</option>
+                            <option value="1">启用</option>
+                            <option value="0">禁用</option>
                         </select>
                     </div>
                 </div>
@@ -125,21 +125,21 @@
                     <td>${u.phone || '-'}</td>
                     <td>${Utils.roleBadge(u.role)}</td>
                     <td class="text-mono text-dim">${u.auth_code || '-'}</td>
-                    <td><span class="badge ${u.is_active ? 'badge-completed' : 'badge-aborted'}">${u.is_active ? '启用' : '禁用'}</span></td>
+                    <td><span class="badge ${u.status === 1 ? 'badge-completed' : 'badge-aborted'}">${u.status === 1 ? '启用' : '禁用'}</span></td>
                     <td class="text-dim">${Utils.formatDateShort(u.created_at)}</td>
                     <td>
-                        <button class="btn btn-ghost btn-sm" onclick="editUser(${u.id}, '${Utils.escapeHtml(u.username)}', '${u.role}', ${u.is_active}, '${u.phone || ''}', '${u.auth_code || ''}')">编辑</button>
+                        <button class="btn btn-ghost btn-sm" onclick="editUser(${u.id}, '${Utils.escapeHtml(u.username)}', '${u.role}', ${u.status}, '${u.phone || ''}', '${u.auth_code || ''}')">编辑</button>
                         <button class="btn btn-ghost btn-sm text-danger" onclick="deleteUser(${u.id}, '${Utils.escapeHtml(u.username)}')">删除</button>
                     </td>
                 </tr>
             `).join('');
         }
 
-        function editUser(id, username, role, active, phone, authCode) {
+        function editUser(id, username, role, status, phone, authCode) {
             document.getElementById('editUserId').value = id;
             document.getElementById('euUsername').value = username;
             document.getElementById('euRole').value = role;
-            document.getElementById('euActive').value = String(active);
+            document.getElementById('euActive').value = String(status);
             document.getElementById('euPhone').value = phone;
             document.getElementById('euAuthCode').value = authCode;
             document.getElementById('euPassword').value = '';
@@ -151,7 +151,7 @@
             const id = document.getElementById('editUserId').value;
             const data = {
                 role: document.getElementById('euRole').value,
-                is_active: document.getElementById('euActive').value === 'true',
+                status: parseInt(document.getElementById('euActive').value),
                 phone: document.getElementById('euPhone').value.trim(),
                 auth_code: document.getElementById('euAuthCode').value.trim()
             };

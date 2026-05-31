@@ -4,3 +4,9 @@ __pycache__/
 .vercel
 node_modules/
 .cursor/plans/
+
+# 原始数据集与论文仅本地保留（仓库为公开仓库，避免公开发布原始研究资料）
+# 入库所需数据已由 analysis/seed_data.json 承载；全量统计可在本地放回数据后复算。
+数据-拉力值1mm纵轴20mm横轴条带/
+paper/
+tests/results.json

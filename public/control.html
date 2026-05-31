@@ -105,8 +105,8 @@
                         <!-- Mini Stats -->
                         <div class="grid grid-2 gap-1">
                             <div class="param-card">
-                                <div class="param-label">当前角度</div>
-                                <div class="param-value" id="ctrlAngle">0°</div>
+                                <div class="param-label">当前位置</div>
+                                <div class="param-value" id="ctrlAngle">0 mm</div>
                             </div>
                             <div class="param-card">
                                 <div class="param-label">平均剥离力</div>
@@ -152,6 +152,12 @@
     <script>
         if (!Auth.requireAuth()) throw new Error('Not authenticated');
         Nav.init();
+
+        // 试验控制属写操作：无写权限时禁用控制并提示
+        const canControl = Auth.canWrite();
+        if (!canControl) {
+            Utils.showToast('当前账号无写权限，仅可查看。需管理员或授权码(test12)', 'warning');
+        }
 
         let activeTestId = null;
         let pollTimer = null;
@@ -255,6 +261,7 @@
         }
 
         async function createTest() {
+            if (!Auth.requireWrite()) return;
             const pid = document.getElementById('projectSelect').value;
             if (!pid) { Utils.showToast('请先选择项目', 'warning'); return; }
 
@@ -284,6 +291,7 @@
         }
 
         async function controlTest(action) {
+            if (!Auth.requireWrite()) return;
             if (!activeTestId) { Utils.showToast('请先选择试验', 'warning'); return; }
 
             if (action === 'abort' && !Utils.confirm('确定要紧急中止试验吗？')) return;
@@ -333,7 +341,7 @@
 
             document.getElementById('ctrlProgress').textContent = `${Utils.formatNumber(progress, 1)}%`;
             document.getElementById('ctrlProgressBar').style.width = `${progress}%`;
-            document.getElementById('ctrlAngle').textContent = `${Utils.formatNumber(data.current_angle, 1)}°`;
+            document.getElementById('ctrlAngle').textContent = `${Utils.formatNumber(data.current_position, 0)} mm`;
             document.getElementById('ctrlAvgForce').textContent = `${Utils.formatNumber(stats.avg_force, 1)} N`;
             document.getElementById('ctrlMaxForce').textContent = `${Utils.formatNumber(stats.max_force, 1)} N`;
             document.getElementById('ctrlActiveStrips').textContent = `${stats.active_strips || 0}/30`;
@@ -352,15 +360,15 @@
 
             if (data.recent_history && data.recent_history.length > 0) {
                 const byStrip = {};
-                const angles = new Set();
+                const positions = new Set();
                 data.recent_history.forEach(d => {
                     const sn = d.strip_number;
                     if (!byStrip[sn]) byStrip[sn] = [];
-                    const angle = parseFloat(d.position_angle).toFixed(1);
-                    byStrip[sn].push({ angle, force: parseFloat(d.force_value) });
-                    angles.add(angle);
+                    const pos = parseFloat(d.position_mm).toFixed(0);
+                    byStrip[sn].push({ pos, force: parseFloat(d.force_value) });
+                    positions.add(pos);
                 });
-                const sortedAngles = [...angles].sort((a, b) => parseFloat(a) - parseFloat(b));
+                const sortedPositions = [...positions].sort((a, b) => parseFloat(a) - parseFloat(b));
                 const series = [];
                 for (let i = 1; i <= 30; i++) {
                     series.push({
@@ -372,7 +380,7 @@
                         data: (byStrip[i] || []).map(p => p.force)
                     });
                 }
-                Charts.update('ctrlChart', { xAxis: { data: sortedAngles }, series });
+                Charts.update('ctrlChart', { xAxis: { data: sortedPositions }, series });
             }
 
             if (!data.is_running && data.test && data.test.status !== 'running') {

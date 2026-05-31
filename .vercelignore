@@ -1,0 +1,21 @@
+# 原始真实数据集（约 679 个 CSV）仅用于本地复现/建模，运行时不需要，
+# 已由 analysis/seed_data.json 承载入库数据，避免上传超限。
+数据-拉力值1mm纵轴20mm横轴条带/
+
+# 论文与文档
+paper/
+*.docx
+
+# 测试与本地产物
+tests/
+TEST_REPORT.md
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# 本地分析脚本（运行时由 init_db 直接读取 seed_data.json，无需这些脚本）
+analysis/dataset.py
+analysis/stats.py
+analysis/figures.py
+analysis/seed.py
+analysis/requirements-analysis.txt

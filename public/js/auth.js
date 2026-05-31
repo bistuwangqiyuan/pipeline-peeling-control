@@ -27,6 +27,12 @@ const Auth = {
         return user && user.role === 'admin';
     },
 
+    // 是否具有写权限（管理员或持有授权码 test12 的用户）
+    canWrite() {
+        const user = this.getUser();
+        return !!(user && (user.role === 'admin' || user.has_write_access));
+    },
+
     requireAuth() {
         if (!this.isLoggedIn()) {
             window.location.href = PAGES.LOGIN;
@@ -38,6 +44,16 @@ const Auth = {
     requireAdmin() {
         if (!this.isAdmin()) {
             Utils.showToast('需要管理员权限', 'error');
+            setTimeout(() => window.location.href = PAGES.DASHBOARD, 1200);
+            return false;
+        }
+        return true;
+    },
+
+    // 写操作守卫：游客或无授权用户提示并阻止
+    requireWrite() {
+        if (!this.canWrite()) {
+            Utils.showToast('需要管理员或授权码(test12)权限，请登录', 'warning');
             return false;
         }
         return true;
@@ -45,19 +61,20 @@ const Auth = {
 
     logout() {
         this.clear();
-        window.location.href = PAGES.LOGIN;
+        window.location.href = PAGES.HOME;
     },
 
     async login(username, password) {
-        const res = await API.post('/auth?action=login', { username, password });
+        const res = await API.post('/auth/login', { username, password });
         if (res.token) {
             this.setAuth(res.token, res.user);
+            try { await this.fetchMe(); } catch (e) {}
         }
         return res;
     },
 
     async register(data) {
-        const res = await API.post('/auth?action=register', data);
+        const res = await API.post('/auth/register', data);
         if (res.token) {
             this.setAuth(res.token, res.user);
         }
@@ -66,7 +83,7 @@ const Auth = {
 
     async fetchMe() {
         try {
-            const res = await API.get('/auth?action=me');
+            const res = await API.get('/auth/me');
             if (res.user) {
                 localStorage.setItem(CONFIG.USER_KEY, JSON.stringify(res.user));
             }

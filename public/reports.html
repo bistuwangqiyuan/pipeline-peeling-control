@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>试验报告 - 管道防腐层剥离控制系统</title>
+    <title>试验报告 - 管道补口剥离控制系统</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/base.css">
     <link rel="stylesheet" href="/css/layout.css">
@@ -26,33 +26,14 @@
             .data-table th { background: #f0f0f0; color: #333; }
             .data-table td { color: #333; border-color: #ddd; }
         }
-        .report-header {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            padding: 2rem;
-            text-align: center;
-            margin-bottom: 1.5rem;
-        }
-        .report-header h2 {
-            font-size: 1.5rem;
-            color: var(--accent-cyan);
-            text-shadow: var(--text-glow-cyan);
-            margin-bottom: 0.5rem;
-        }
-        .report-header .report-meta {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-        }
-        .report-section {
-            margin-bottom: 1.5rem;
-        }
-        .report-section h3 {
-            font-size: 1.1rem;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border-color);
-        }
+        .report-header { background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg); padding: 2rem; text-align: center; margin-bottom: 1.5rem; }
+        .report-header h2 { font-size: 1.5rem; color: var(--accent-cyan);
+            text-shadow: var(--text-glow-cyan); margin-bottom: 0.5rem; }
+        .report-header .report-meta { color: var(--text-secondary); font-size: 0.85rem; }
+        .report-section { margin-bottom: 1.5rem; }
+        .report-section h3 { font-size: 1.1rem; margin-bottom: 1rem; padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color); }
     </style>
 </head>
 <body>
@@ -68,8 +49,10 @@
                     <select class="form-select" id="testFilter" style="width:200px;" onchange="generateReport()">
                         <option value="">选择试验</option>
                     </select>
-                    <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 打印报告</button>
-                    <button class="btn btn-secondary btn-sm" onclick="exportCSV()">导出CSV</button>
+                    <button class="btn btn-primary btn-sm" onclick="downloadDocx()">📄 Word报告</button>
+                    <button class="btn btn-secondary btn-sm" onclick="downloadZip()">🗜 项目批量ZIP</button>
+                    <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 打印</button>
+                    <button class="btn btn-ghost btn-sm" onclick="exportCSV()">导出CSV</button>
                 </div>
             </div>
             <div class="page-body">
@@ -82,7 +65,7 @@
 
                 <div id="reportContent" style="display:none;">
                     <div class="report-header">
-                        <h2>管道防腐层剥离试验报告</h2>
+                        <h2>管道补口防腐层剥离试验报告</h2>
                         <div class="report-meta" id="reportMeta"></div>
                     </div>
 
@@ -107,19 +90,19 @@
                         <h3>二、总体统计结果</h3>
                         <div class="grid grid-4 mb-2">
                             <div class="stat-card accent-cyan"><div class="stat-label">平均剥离力</div><div class="stat-value" id="rAvg">-<span class="stat-unit"> N</span></div></div>
-                            <div class="stat-card accent-blue"><div class="stat-label">最大剥离力</div><div class="stat-value" id="rMax">-<span class="stat-unit"> N</span></div></div>
-                            <div class="stat-card accent-success"><div class="stat-label">最小剥离力</div><div class="stat-value" id="rMin">-<span class="stat-unit"> N</span></div></div>
+                            <div class="stat-card accent-blue"><div class="stat-label">峰值剥离力</div><div class="stat-value" id="rMax">-<span class="stat-unit"> N</span></div></div>
+                            <div class="stat-card accent-success"><div class="stat-label">合格率(≥70N)</div><div class="stat-value" id="rPass">-<span class="stat-unit"> %</span></div></div>
                             <div class="stat-card accent-warning"><div class="stat-label">标准差</div><div class="stat-value" id="rStd">-<span class="stat-unit"> N</span></div></div>
                         </div>
                     </div>
 
                     <div class="report-section">
-                        <h3>三、剥离力-角度曲线</h3>
-                        <div class="card"><div class="chart-container" id="rChartAngle" style="min-height:400px;"></div></div>
+                        <h3>三、剥离力分布直方图</h3>
+                        <div class="card"><div class="chart-container" id="rChartHist" style="min-height:360px;"></div></div>
                     </div>
 
                     <div class="report-section">
-                        <h3>四、各条带剥离力对比</h3>
+                        <h3>四、各条带平均剥离力对比</h3>
                         <div class="card"><div class="chart-container" id="rChartBar" style="min-height:350px;"></div></div>
                     </div>
 
@@ -129,13 +112,8 @@
                             <table class="data-table">
                                 <thead>
                                     <tr>
-                                        <th>条带编号</th>
-                                        <th>平均力 (N)</th>
-                                        <th>最大力 (N)</th>
-                                        <th>最小力 (N)</th>
-                                        <th>标准差 (N)</th>
-                                        <th>总位移 (mm)</th>
-                                        <th>结论</th>
+                                        <th>条带编号</th><th>平均力 (N)</th><th>最大力 (N)</th>
+                                        <th>最小力 (N)</th><th>标准差 (N)</th><th>数据点</th><th>结论</th>
                                     </tr>
                                 </thead>
                                 <tbody id="rTableBody"></tbody>
@@ -159,14 +137,12 @@
     <script src="/js/nav.js"></script>
     <script src="/js/charts.js"></script>
     <script>
-        if (!Auth.requireAuth()) throw new Error('Not authenticated');
         Nav.init();
 
         async function loadProjects() {
             try {
                 const res = await API.get('/projects?per_page=100');
                 const select = document.getElementById('projectFilter');
-                select.innerHTML = '<option value="">选择项目</option>';
                 (res.projects || []).forEach(p => {
                     select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
                 });
@@ -193,7 +169,6 @@
                 document.getElementById('reportContent').style.display = 'none';
                 return;
             }
-
             try {
                 const res = await API.get(`/data?action=analysis&test_id=${testId}`);
                 document.getElementById('noData').style.display = 'none';
@@ -224,51 +199,59 @@
 
             document.getElementById('rAvg').innerHTML = `${Utils.formatNumber(os.overall_avg, 1)}<span class="stat-unit"> N</span>`;
             document.getElementById('rMax').innerHTML = `${Utils.formatNumber(os.overall_max, 1)}<span class="stat-unit"> N</span>`;
-            document.getElementById('rMin').innerHTML = `${Utils.formatNumber(os.overall_min, 1)}<span class="stat-unit"> N</span>`;
+            document.getElementById('rPass').innerHTML = `${Utils.formatNumber(os.pass_rate, 1)}<span class="stat-unit"> %</span>`;
             document.getElementById('rStd').innerHTML = `${Utils.formatNumber(os.overall_std, 1)}<span class="stat-unit"> N</span>`;
 
-            if (data.force_vs_angle && data.force_vs_angle.length > 0) {
-                Charts.forceVsAngleChart('rChartAngle', data.force_vs_angle);
-            }
-
+            Charts.forceDistributionChart('rChartHist', data.histogram || []);
             if (stats.length > 0) {
                 Charts.forceBarChart('rChartBar',
                     stats.map(s => `#${s.strip_number}`),
-                    stats.map(s => parseFloat(s.avg_force))
-                );
+                    stats.map(s => parseFloat(s.avg_force)));
             }
 
             const tbody = document.getElementById('rTableBody');
-            tbody.innerHTML = stats.map(s => {
-                const pass = parseFloat(s.avg_force) > CONFIG.FORCE_ALARM_LOW;
-                return `<tr>
+            tbody.innerHTML = stats.map(s => `
+                <tr>
                     <td class="text-mono font-bold">#${s.strip_number}</td>
                     <td class="text-mono">${Utils.formatNumber(s.avg_force, 2)}</td>
                     <td class="text-mono">${Utils.formatNumber(s.max_force, 2)}</td>
                     <td class="text-mono">${Utils.formatNumber(s.min_force, 2)}</td>
                     <td class="text-mono">${Utils.formatNumber(s.std_force, 2)}</td>
-                    <td class="text-mono">${Utils.formatNumber(s.total_displacement, 2)}</td>
-                    <td><span class="badge ${pass ? 'badge-completed' : 'badge-aborted'}">${pass ? '合格' : '不合格'}</span></td>
-                </tr>`;
-            }).join('');
+                    <td class="text-mono text-dim">${s.data_points}</td>
+                    <td><span class="badge ${s.pass_fail ? 'badge-completed' : 'badge-aborted'}">${s.pass_fail ? '合格' : '不合格'}</span></td>
+                </tr>`).join('');
 
-            const passCount = stats.filter(s => parseFloat(s.avg_force) > CONFIG.FORCE_ALARM_LOW).length;
+            const passCount = stats.filter(s => s.pass_fail).length;
             const rate = stats.length > 0 ? (passCount / stats.length * 100).toFixed(1) : 0;
             document.getElementById('rConclusion').innerHTML = `
-                <p>本次剥离试验共测试 <strong>${stats.length}</strong> 条防腐层条带，管道圆周剥离角度覆盖 360°。</p>
+                <p>本次剥离试验共测试 <strong>${stats.length}</strong> 条防腐层条带（每条宽 20 mm）。</p>
                 <p>整体平均剥离力为 <strong class="text-cyan">${Utils.formatNumber(os.overall_avg, 1)} N</strong>，
-                   最大剥离力为 <strong>${Utils.formatNumber(os.overall_max, 1)} N</strong>，
+                   峰值剥离力为 <strong>${Utils.formatNumber(os.overall_max, 1)} N</strong>，
                    标准差为 <strong>${Utils.formatNumber(os.overall_std, 1)} N</strong>。</p>
-                <p>合格条带数: <strong class="text-success">${passCount}</strong> / ${stats.length}，
-                   合格率: <strong class="text-cyan">${rate}%</strong>。</p>
-                <p>数据记录总点数: <strong>${os.total_points}</strong>。</p>
+                <p>采样点合格率(≥70N): <strong class="text-cyan">${Utils.formatNumber(os.pass_rate, 1)}%</strong>；
+                   合格条带数: <strong class="text-success">${passCount}</strong> / ${stats.length}（${rate}%）。</p>
+                <p>数据记录总点数: <strong>${os.total_points}</strong>。
+                   ${parseFloat(rate) >= 60 ? '整体粘接质量良好。' : '存在较多弱粘/缺陷区域，建议复检该补口。'}</p>
             `;
         }
 
+        function curTest() { return document.getElementById('testFilter').value; }
+        function curProject() { return document.getElementById('projectFilter').value; }
+
+        function downloadDocx() {
+            const t = curTest();
+            if (!t) { Utils.showToast('请先选择试验', 'warning'); return; }
+            API.download(`/reports/test?test_id=${t}`, `report_${t}.docx`).catch(e => Utils.showToast(e.message, 'error'));
+        }
+        function downloadZip() {
+            const p = curProject();
+            if (!p) { Utils.showToast('请先选择项目', 'warning'); return; }
+            API.download(`/reports/project?project_id=${p}`, `reports_${p}.zip`).catch(e => Utils.showToast(e.message, 'error'));
+        }
         function exportCSV() {
-            const testId = document.getElementById('testFilter').value;
-            if (!testId) return;
-            window.open(`/api/data?action=export&test_id=${testId}`, '_blank');
+            const t = curTest();
+            if (!t) return;
+            API.download(`/data?action=export&test_id=${t}`, `test_${t}.csv`).catch(e => Utils.showToast(e.message, 'error'));
         }
 
         loadProjects();

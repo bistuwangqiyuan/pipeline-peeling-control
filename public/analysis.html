@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>数据分析 - 管道防腐层剥离控制系统</title>
+    <title>数据分析 - 管道补口剥离控制系统</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/base.css">
     <link rel="stylesheet" href="/css/layout.css">
@@ -20,94 +20,108 @@
             <div class="page-header">
                 <h1>📈 数据分析</h1>
                 <div class="header-actions">
-                    <select class="form-select" id="projectFilter" style="width:200px;" onchange="loadTests()">
-                        <option value="">选择项目</option>
+                    <select class="form-select" id="projectFilter" style="width:200px;" onchange="onProjectChange()">
+                        <option value="">全部项目（总览）</option>
                     </select>
-                    <select class="form-select" id="testFilter" style="width:200px;" onchange="loadAnalysis()">
-                        <option value="">选择试验</option>
+                    <select class="form-select" id="testFilter" style="width:220px;" onchange="loadAnalysis()">
+                        <option value="">项目总览（不选试验）</option>
                     </select>
                     <button class="btn btn-secondary btn-sm" id="exportBtn" onclick="exportData()" disabled>导出CSV</button>
                 </div>
             </div>
             <div class="page-body">
-                <div id="noData" class="card animate-fade-in">
-                    <div class="empty-state">
-                        <div class="empty-icon">📊</div>
-                        <p>请选择项目和试验以查看分析数据</p>
+                <!-- 总览（跨试验） -->
+                <div id="overview">
+                    <div class="grid grid-2 mb-2">
+                        <div class="dashboard-chart-card animate-slide-up stagger-1">
+                            <div class="card-title"><span class="icon">〰</span> 剥离力趋势（按试验时间）</div>
+                            <div class="chart-container" id="ovTrend" style="min-height:340px;"></div>
+                        </div>
+                        <div class="dashboard-chart-card animate-slide-up stagger-2">
+                            <div class="card-title"><span class="icon">▮</span> 各项目剥离力对比（点击钻取）</div>
+                            <div class="chart-container" id="ovComparison" style="min-height:340px;"></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-2 mb-2">
+                        <div class="dashboard-chart-card animate-slide-up stagger-3">
+                            <div class="card-title"><span class="icon">▤</span> 全集剥离力分布直方图</div>
+                            <div class="chart-container" id="ovHist" style="min-height:320px;"></div>
+                        </div>
+                        <div class="dashboard-chart-card animate-slide-up stagger-4">
+                            <div class="card-title"><span class="icon">◔</span> 合格率（≥70N 采样点）</div>
+                            <div class="chart-container" id="ovPie" style="min-height:320px;"></div>
+                        </div>
                     </div>
                 </div>
 
+                <!-- 单试验分析 -->
                 <div id="analysisContent" style="display:none;">
-                    <!-- Overall Stats -->
                     <div class="grid grid-4 mb-2">
                         <div class="stat-card accent-cyan animate-fade-in-up stagger-1">
                             <div class="stat-label">整体平均力</div>
                             <div class="stat-value" id="anaAvg">-<span class="stat-unit"> N</span></div>
                         </div>
                         <div class="stat-card accent-blue animate-fade-in-up stagger-2">
-                            <div class="stat-label">整体最大力</div>
+                            <div class="stat-label">峰值剥离力</div>
                             <div class="stat-value" id="anaMax">-<span class="stat-unit"> N</span></div>
                         </div>
                         <div class="stat-card accent-success animate-fade-in-up stagger-3">
-                            <div class="stat-label">整体最小力</div>
-                            <div class="stat-value" id="anaMin">-<span class="stat-unit"> N</span></div>
+                            <div class="stat-label">合格率(≥70N)</div>
+                            <div class="stat-value" id="anaPass">-<span class="stat-unit"> %</span></div>
                         </div>
                         <div class="stat-card accent-warning animate-fade-in-up stagger-4">
-                            <div class="stat-label">数据点数</div>
+                            <div class="stat-label">采样点数</div>
                             <div class="stat-value" id="anaPoints">-</div>
                         </div>
                     </div>
 
-                    <!-- Charts Row 1 -->
                     <div class="grid grid-2 mb-2">
                         <div class="dashboard-chart-card animate-slide-up stagger-1">
-                            <div class="card-title"><span class="icon">〰</span> 剥离力-角度曲线</div>
-                            <div class="chart-container" id="chartForceAngle" style="min-height:380px;"></div>
+                            <div class="card-title"><span class="icon">▮</span> 各条带平均剥离力（点击钻取曲线）</div>
+                            <div class="chart-container" id="chartStripBar" style="min-height:360px;"></div>
                         </div>
                         <div class="dashboard-chart-card animate-slide-up stagger-2">
-                            <div class="card-title"><span class="icon">▮</span> 30条平均剥离力对比</div>
-                            <div class="chart-container" id="chartForceBar" style="min-height:380px;"></div>
+                            <div class="card-title"><span class="icon">〰</span> 钻取：条带剥离力-位移曲线</div>
+                            <div class="chart-container" id="chartDrill" style="min-height:360px;"></div>
                         </div>
                     </div>
 
-                    <!-- Charts Row 2 -->
                     <div class="grid grid-2 mb-2">
                         <div class="dashboard-chart-card animate-slide-up stagger-3">
                             <div class="card-title"><span class="icon">▤</span> 剥离力分布直方图</div>
-                            <div class="chart-container" id="chartDistribution" style="min-height:350px;"></div>
+                            <div class="chart-container" id="chartDistribution" style="min-height:340px;"></div>
                         </div>
                         <div class="dashboard-chart-card animate-slide-up stagger-4">
-                            <div class="card-title"><span class="icon">◔</span> 合格率分析</div>
-                            <div class="chart-container" id="chartPie" style="min-height:350px;"></div>
+                            <div class="card-title"><span class="icon">📉</span> 剥离力累积分布</div>
+                            <div class="chart-container" id="chartCumulative" style="min-height:340px;"></div>
                         </div>
                     </div>
 
-                    <!-- Box Chart -->
-                    <div class="dashboard-chart-card mb-2 animate-slide-up stagger-5">
-                        <div class="card-title"><span class="icon">▥</span> 条带力统计箱线图</div>
-                        <div class="chart-container" id="chartBox" style="min-height:350px;"></div>
+                    <div class="grid grid-2 mb-2">
+                        <div class="dashboard-chart-card animate-slide-up stagger-5">
+                            <div class="card-title"><span class="icon">◔</span> 条带合格率</div>
+                            <div class="chart-container" id="chartPie" style="min-height:320px;"></div>
+                        </div>
+                        <div class="dashboard-chart-card animate-slide-up stagger-6">
+                            <div class="card-title"><span class="icon">▥</span> 条带力统计箱线图</div>
+                            <div class="chart-container" id="chartBox" style="min-height:320px;"></div>
+                        </div>
                     </div>
 
-                    <!-- Statistics Table -->
-                    <div class="card animate-slide-up stagger-6">
+                    <div class="card animate-slide-up">
                         <div class="card-header">
                             <div class="card-title"><span class="icon">▤</span> 条带统计明细</div>
+                            <button class="btn btn-secondary btn-sm" onclick="reportDocx()">导出Word报告</button>
                         </div>
                         <div style="overflow-x:auto;">
                             <table class="data-table">
                                 <thead>
                                     <tr>
-                                        <th>条带#</th>
-                                        <th>平均力 (N)</th>
-                                        <th>最大力 (N)</th>
-                                        <th>最小力 (N)</th>
-                                        <th>标准差 (N)</th>
-                                        <th>总位移 (mm)</th>
-                                        <th>数据点</th>
+                                        <th>条带#</th><th>平均力 (N)</th><th>最大力 (N)</th>
+                                        <th>最小力 (N)</th><th>标准差 (N)</th><th>判定</th><th>数据点</th>
                                     </tr>
                                 </thead>
-                                <tbody id="statsTableBody">
-                                </tbody>
+                                <tbody id="statsTableBody"></tbody>
                             </table>
                         </div>
                     </div>
@@ -123,44 +137,82 @@
     <script src="/js/nav.js"></script>
     <script src="/js/charts.js"></script>
     <script>
-        if (!Auth.requireAuth()) throw new Error('Not authenticated');
         Nav.init();
+        let currentTestId = null;
 
         async function loadProjects() {
             try {
                 const res = await API.get('/projects?per_page=100');
                 const select = document.getElementById('projectFilter');
-                select.innerHTML = '<option value="">选择项目</option>';
                 (res.projects || []).forEach(p => {
                     select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
                 });
             } catch (e) {}
+            loadOverview();
+        }
+
+        async function onProjectChange() {
+            await loadTests();
+            const testFilter = document.getElementById('testFilter');
+            testFilter.value = '';
+            loadAnalysis();
         }
 
         async function loadTests() {
             const pid = document.getElementById('projectFilter').value;
             const select = document.getElementById('testFilter');
-            select.innerHTML = '<option value="">选择试验</option>';
-            if (!pid) return;
+            select.innerHTML = '<option value="">项目总览（不选试验）</option>';
+            const url = pid ? `/tests?project_id=${pid}&per_page=100` : '/tests?per_page=100';
             try {
-                const res = await API.get(`/tests?project_id=${pid}&per_page=100`);
+                const res = await API.get(url);
                 (res.tests || []).forEach(t => {
                     select.innerHTML += `<option value="${t.id}">${t.test_number} (${STATUS_LABELS[t.status] || t.status})</option>`;
                 });
             } catch (e) {}
         }
 
+        async function loadOverview() {
+            const pid = document.getElementById('projectFilter').value;
+            const url = pid ? `/data?action=dataset&project_id=${pid}` : '/data?action=dataset';
+            try {
+                const res = await API.get(url);
+                const trend = res.trend || [];
+                Charts.trendChart('ovTrend',
+                    trend.map(t => t.test_number),
+                    trend.map(t => parseFloat(t.max_force) || 0),
+                    trend.map(t => parseFloat(t.pass_rate) || 0));
+                const comp = (res.comparison || []).filter(c => c.test_count > 0);
+                const cmpChart = Charts.comparisonBarChart('ovComparison',
+                    comp.map(c => c.name),
+                    comp.map(c => parseFloat(c.avg_max_force) || 0));
+                if (cmpChart) {
+                    cmpChart.off('click');
+                    cmpChart.on('click', (p) => {
+                        const proj = comp[p.dataIndex];
+                        if (proj) {
+                            document.getElementById('projectFilter').value = proj.id;
+                            onProjectChange();
+                        }
+                    });
+                }
+                Charts.forceDistributionChart('ovHist', res.histogram || []);
+                Charts.passfailPieChart('ovPie', res.pass_pie.pass, res.pass_pie.fail);
+            } catch (e) { Utils.showToast('加载总览失败', 'error'); }
+        }
+
         async function loadAnalysis() {
             const testId = document.getElementById('testFilter').value;
+            currentTestId = testId || null;
             if (!testId) {
-                document.getElementById('noData').style.display = '';
+                document.getElementById('overview').style.display = '';
                 document.getElementById('analysisContent').style.display = 'none';
+                document.getElementById('exportBtn').disabled = true;
+                loadOverview();
                 return;
             }
-
             try {
                 const res = await API.get(`/data?action=analysis&test_id=${testId}`);
-                document.getElementById('noData').style.display = 'none';
+                document.getElementById('overview').style.display = 'none';
                 document.getElementById('analysisContent').style.display = '';
                 document.getElementById('exportBtn').disabled = false;
                 renderAnalysis(res);
@@ -173,81 +225,69 @@
             const os = data.overall_stats || {};
             document.getElementById('anaAvg').innerHTML = `${Utils.formatNumber(os.overall_avg, 1)}<span class="stat-unit"> N</span>`;
             document.getElementById('anaMax').innerHTML = `${Utils.formatNumber(os.overall_max, 1)}<span class="stat-unit"> N</span>`;
-            document.getElementById('anaMin').innerHTML = `${Utils.formatNumber(os.overall_min, 1)}<span class="stat-unit"> N</span>`;
+            document.getElementById('anaPass').innerHTML = `${Utils.formatNumber(os.pass_rate, 1)}<span class="stat-unit"> %</span>`;
             document.getElementById('anaPoints').textContent = os.total_points || '-';
 
-            // Force vs Angle
-            if (data.force_vs_angle && data.force_vs_angle.length > 0) {
-                Charts.forceVsAngleChart('chartForceAngle', data.force_vs_angle);
-            }
-
-            // Bar chart
             const stripStats = data.strip_stats || [];
-            if (stripStats.length > 0) {
-                const labels = stripStats.map(s => `#${s.strip_number}`);
-                const values = stripStats.map(s => parseFloat(s.avg_force));
-                Charts.forceBarChart('chartForceBar', labels, values);
+            const labels = stripStats.map(s => `#${s.strip_number}`);
+            const values = stripStats.map(s => parseFloat(s.avg_force));
+            const barChart = Charts.forceBarChart('chartStripBar', labels, values);
+            if (barChart) {
+                barChart.off('click');
+                barChart.on('click', (p) => drillStrip(stripStats[p.dataIndex].strip_number));
             }
 
-            // Distribution
-            if (data.force_distribution && data.force_distribution.length > 0) {
-                Charts.forceDistributionChart('chartDistribution', data.force_distribution);
-            }
+            Charts.forceDistributionChart('chartDistribution', data.histogram || []);
+            Charts.cumulativeChart('chartCumulative', data.cumulative || []);
+            Charts.passfailPieChart('chartPie', data.pass_pie.pass, data.pass_pie.fail);
 
-            // Pie
-            const pass = stripStats.filter(s => parseFloat(s.avg_force) > CONFIG.FORCE_ALARM_LOW).length;
-            const fail = stripStats.length - pass;
-            Charts.passfailPieChart('chartPie', pass, fail);
+            const boxData = stripStats.map(s => [
+                parseFloat(s.min_force),
+                parseFloat(s.avg_force) - parseFloat(s.std_force || 0),
+                parseFloat(s.avg_force),
+                parseFloat(s.avg_force) + parseFloat(s.std_force || 0),
+                parseFloat(s.max_force)
+            ]);
+            Charts.init('chartBox', {
+                color: ['#00d4ff'],
+                title: { text: '条带力统计', left: 'center', textStyle: { fontSize: 13, color: '#e0e8ff' } },
+                xAxis: { type: 'category', data: labels, ...CHART_THEME.xAxis },
+                yAxis: { type: 'value', ...CHART_THEME.yAxis, name: '力 (N)' },
+                series: [{ type: 'boxplot', data: boxData,
+                    itemStyle: { color: 'rgba(0,212,255,0.15)', borderColor: '#00d4ff' } }]
+            });
 
-            // Box chart
-            if (stripStats.length > 0) {
-                const boxData = stripStats.map(s => [
-                    parseFloat(s.min_force),
-                    parseFloat(s.avg_force) - parseFloat(s.std_force || 0),
-                    parseFloat(s.avg_force),
-                    parseFloat(s.avg_force) + parseFloat(s.std_force || 0),
-                    parseFloat(s.max_force)
-                ]);
-
-                Charts.init('chartBox', {
-                    color: ['#00d4ff'],
-                    title: { text: '条带力统计', left: 'center', textStyle: { fontSize: 13, color: '#e0e8ff' } },
-                    xAxis: {
-                        type: 'category',
-                        data: stripStats.map(s => `#${s.strip_number}`),
-                        ...CHART_THEME.xAxis
-                    },
-                    yAxis: { type: 'value', ...CHART_THEME.yAxis, name: '力 (N)' },
-                    series: [{
-                        type: 'boxplot',
-                        data: boxData,
-                        itemStyle: {
-                            color: 'rgba(0, 212, 255, 0.15)',
-                            borderColor: '#00d4ff'
-                        }
-                    }]
-                });
-            }
-
-            // Table
             const tbody = document.getElementById('statsTableBody');
             tbody.innerHTML = stripStats.map(s => `
-                <tr>
+                <tr style="cursor:pointer" onclick="drillStrip(${s.strip_number})">
                     <td class="text-mono font-bold">#${s.strip_number}</td>
                     <td class="text-mono">${Utils.formatNumber(s.avg_force, 2)}</td>
                     <td class="text-mono text-cyan">${Utils.formatNumber(s.max_force, 2)}</td>
                     <td class="text-mono">${Utils.formatNumber(s.min_force, 2)}</td>
                     <td class="text-mono">${Utils.formatNumber(s.std_force, 2)}</td>
-                    <td class="text-mono">${Utils.formatNumber(s.total_displacement, 2)}</td>
+                    <td>${s.pass_fail ? '<span class="badge badge-completed">合格</span>' : '<span class="badge badge-aborted">不合格</span>'}</td>
                     <td class="text-mono text-dim">${s.data_points}</td>
-                </tr>
-            `).join('');
+                </tr>`).join('');
+
+            if (stripStats.length > 0) drillStrip(stripStats[0].strip_number);
+        }
+
+        async function drillStrip(stripNumber) {
+            if (!currentTestId) return;
+            try {
+                const res = await API.get(`/data?action=history&test_id=${currentTestId}&strip_number=${stripNumber}&per_page=5000`);
+                Charts.forceVsPositionChart('chartDrill', res.data || [], stripNumber);
+            } catch (e) {}
         }
 
         function exportData() {
-            const testId = document.getElementById('testFilter').value;
-            if (!testId) return;
-            window.open(`/api/data?action=export&test_id=${testId}`, '_blank');
+            if (!currentTestId) return;
+            API.download(`/data?action=export&test_id=${currentTestId}`, `test_${currentTestId}.csv`).catch(e => Utils.showToast(e.message, 'error'));
+        }
+
+        function reportDocx() {
+            if (!currentTestId) return;
+            API.download(`/reports/test?test_id=${currentTestId}`, `report_${currentTestId}.docx`).catch(e => Utils.showToast(e.message, 'error'));
         }
 
         loadProjects();

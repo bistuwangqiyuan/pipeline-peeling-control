@@ -12,13 +12,9 @@ class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         options_response(self)
 
+    # 读操作：游客可访问（论文 3.1 渐进式开放）
     def do_GET(self):
         try:
-            payload = get_user_from_request(self.headers)
-            if not payload:
-                error_response(self, '未授权访问', 401)
-                return
-
             params = get_query_params(self)
             pid = params.get('id')
 
@@ -33,10 +29,18 @@ class handler(BaseHTTPRequestHandler):
                     error_response(self, '项目不存在', 404)
                     return
                 tests = query(
-                    "SELECT * FROM peeling_tests WHERE project_id = %s ORDER BY created_at DESC",
+                    "SELECT * FROM tests WHERE project_id = %s ORDER BY created_at DESC",
                     (pid,), fetchall=True
                 )
-                json_response(self, {'project': project, 'tests': tests})
+                stats = query(
+                    """SELECT COUNT(*) AS test_count,
+                              ROUND(AVG(max_force)::numeric, 2) AS avg_max_force,
+                              ROUND(MAX(max_force)::numeric, 2) AS peak_force,
+                              ROUND(AVG(pass_rate)::numeric, 2) AS avg_pass_rate
+                       FROM tests WHERE project_id = %s""",
+                    (pid,), fetchone=True
+                )
+                json_response(self, {'project': project, 'tests': tests, 'stats': stats})
                 return
 
             status_filter = params.get('status')
@@ -47,7 +51,6 @@ class handler(BaseHTTPRequestHandler):
 
             where_clauses = []
             where_params = []
-
             if status_filter:
                 where_clauses.append("p.status = %s")
                 where_params.append(status_filter)
@@ -61,9 +64,9 @@ class handler(BaseHTTPRequestHandler):
                 f"SELECT COUNT(*) as total FROM projects p WHERE {where_sql}",
                 where_params, fetchone=True
             )
-
             projects = query(
-                f"""SELECT p.*, u.username as creator_name
+                f"""SELECT p.*, u.username as creator_name,
+                        (SELECT COUNT(*) FROM tests t WHERE t.project_id = p.id) AS test_count
                     FROM projects p LEFT JOIN users u ON p.created_by = u.id
                     WHERE {where_sql}
                     ORDER BY p.created_at DESC LIMIT %s OFFSET %s""",
@@ -80,7 +83,7 @@ class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             payload = get_user_from_request(self.headers)
-            if not payload or not can_modify(payload):
+            if not can_modify(payload):
                 error_response(self, '无修改权限', 403)
                 return
 
@@ -91,14 +94,13 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             project = execute_returning(
-                """INSERT INTO projects (name, description, pipe_diameter, layer_width, layer_thickness,
-                   strip_count, strip_width, estimated_force, location, created_by)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *""",
-                (name, body.get('description', ''), body.get('pipe_diameter', 1000),
+                """INSERT INTO projects (name, description, pipe_diameter, layer_width,
+                   layer_thickness, strip_width, location, status, created_by)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *""",
+                (name, body.get('description', ''), body.get('pipe_diameter', 1016),
                  body.get('layer_width', 600), body.get('layer_thickness', 1.0),
-                 body.get('strip_count', 30), body.get('strip_width', 20),
-                 body.get('estimated_force', 30000), body.get('location', ''),
-                 payload['user_id'])
+                 body.get('strip_width', 20), body.get('location', ''),
+                 body.get('status', 'created'), payload['user_id'])
             )
 
             query(
@@ -112,7 +114,7 @@ class handler(BaseHTTPRequestHandler):
     def do_PUT(self):
         try:
             payload = get_user_from_request(self.headers)
-            if not payload or not can_modify(payload):
+            if not can_modify(payload):
                 error_response(self, '无修改权限', 403)
                 return
 
@@ -126,8 +128,7 @@ class handler(BaseHTTPRequestHandler):
             fields = []
             values = []
             for key in ['name', 'description', 'pipe_diameter', 'layer_width',
-                        'layer_thickness', 'strip_count', 'strip_width',
-                        'estimated_force', 'location', 'status']:
+                        'layer_thickness', 'strip_width', 'location', 'status']:
                 if key in body:
                     fields.append(f"{key} = %s")
                     values.append(body[key])
@@ -136,9 +137,14 @@ class handler(BaseHTTPRequestHandler):
                 error_response(self, '没有要更新的字段')
                 return
 
-            fields.append("updated_at = CURRENT_TIMESTAMP")
+            fields.append("updated_at = NOW()")
             values.append(pid)
             execute(f"UPDATE projects SET {', '.join(fields)} WHERE id = %s", values)
+
+            query(
+                "INSERT INTO audit_log (user_id, action, resource_type, resource_id) VALUES (%s, %s, %s, %s)",
+                (payload['user_id'], 'update', 'project', int(pid))
+            )
 
             project = query("SELECT * FROM projects WHERE id = %s", (pid,), fetchone=True)
             json_response(self, {'project': project})
@@ -148,7 +154,7 @@ class handler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         try:
             payload = get_user_from_request(self.headers)
-            if not payload or not can_modify(payload):
+            if not can_modify(payload):
                 error_response(self, '无修改权限', 403)
                 return
 
@@ -159,6 +165,10 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             execute("DELETE FROM projects WHERE id = %s", (pid,))
+            query(
+                "INSERT INTO audit_log (user_id, action, resource_type, resource_id) VALUES (%s, %s, %s, %s)",
+                (payload['user_id'], 'delete', 'project', int(pid))
+            )
             json_response(self, {'message': '项目已删除'})
         except Exception as e:
             error_response(self, str(e), 500)

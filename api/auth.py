@@ -41,7 +41,7 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             user = query(
-                "SELECT id, username, password_hash, role, is_active FROM users WHERE username = %s",
+                "SELECT id, username, password_hash, role, status FROM users WHERE username = %s",
                 (username,),
                 fetchone=True
             )
@@ -50,7 +50,7 @@ class handler(BaseHTTPRequestHandler):
                 error_response(self, '用户名或密码错误', 401)
                 return
 
-            if not user['is_active']:
+            if user['status'] != 1:
                 error_response(self, '账号已被禁用', 403)
                 return
 
@@ -135,7 +135,7 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             user = query(
-                """SELECT id, username, phone, role, auth_code, is_active, created_at
+                """SELECT id, username, phone, role, auth_code, status, created_at
                    FROM users WHERE id = %s""",
                 (payload['user_id'],),
                 fetchone=True
@@ -153,7 +153,7 @@ class handler(BaseHTTPRequestHandler):
                     'username': user['username'],
                     'phone': user['phone'],
                     'role': user['role'],
-                    'is_active': user['is_active'],
+                    'status': user['status'],
                     'has_write_access': has_write_access,
                     'created_at': user['created_at'].isoformat() if user['created_at'] else None
                 }

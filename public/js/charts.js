@@ -119,13 +119,14 @@ const Charts = {
                 type: 'category',
                 data: [],
                 ...CHART_THEME.xAxis,
-                name: '角度 (°)',
+                name: '位置 (mm)',
                 nameTextStyle: { color: '#8892b0' }
             },
             yAxis: {
                 type: 'value',
                 ...CHART_THEME.yAxis,
                 name: '力 (N)',
+                max: 110,
                 nameTextStyle: { color: '#8892b0' }
             },
             series: series,
@@ -260,6 +261,95 @@ const Charts = {
             },
             series: series,
             dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 30 }]
+        });
+    },
+
+    // 单条带剥离力-位移曲线（数据分析钻取用）
+    forceVsPositionChart(id, points, stripNumber) {
+        const data = (points || []).map(p => [parseFloat(p.position_mm), parseFloat(p.force_value)]);
+        return this.init(id, {
+            color: ['#00d4ff'],
+            title: { text: stripNumber ? `第${stripNumber}条带 剥离力-位移曲线` : '剥离力-位移曲线',
+                     left: 'center', textStyle: { fontSize: 13, color: '#e0e8ff' } },
+            xAxis: { type: 'value', ...CHART_THEME.xAxis, name: '位置 (mm)' },
+            yAxis: { type: 'value', ...CHART_THEME.yAxis, name: '力 (N)' },
+            series: [{
+                type: 'line', smooth: true, symbol: 'none', data,
+                lineStyle: { width: 1.4, color: '#00d4ff' },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(0,212,255,0.35)' },
+                        { offset: 1, color: 'rgba(0,212,255,0.02)' }])
+                },
+                markLine: {
+                    silent: true, symbol: 'none',
+                    data: [{ yAxis: CONFIG.PASS_THRESHOLD, lineStyle: { color: '#ff3366', type: 'dashed' },
+                             label: { formatter: '阈值 70N', color: '#ff3366' } },
+                           { yAxis: CONFIG.GOOD_BOND_PLATFORM, lineStyle: { color: '#00ff88', type: 'dashed' },
+                             label: { formatter: '平台 96N', color: '#00ff88' } }]
+                }
+            }],
+            dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 8 }]
+        });
+    },
+
+    // 累积分布曲线
+    cumulativeChart(id, cumulative) {
+        const data = (cumulative || []).map(c => [c.force, c.cum_pct]);
+        return this.init(id, {
+            title: { text: '剥离力累积分布', left: 'center', textStyle: { fontSize: 13, color: '#e0e8ff' } },
+            xAxis: { type: 'value', ...CHART_THEME.xAxis, name: '力 (N)', max: 120 },
+            yAxis: { type: 'value', ...CHART_THEME.yAxis, name: '累积 %', max: 100 },
+            series: [{
+                type: 'line', smooth: true, symbol: 'none', data,
+                lineStyle: { width: 2, color: '#ffaa00' },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(255,170,0,0.3)' },
+                        { offset: 1, color: 'rgba(255,170,0,0.02)' }])
+                }
+            }]
+        });
+    },
+
+    // 跨项目对比柱图（可点击联动）
+    comparisonBarChart(id, labels, values, unit = 'N') {
+        return this.init(id, {
+            title: { text: '各项目剥离力对比', left: 'center', textStyle: { fontSize: 13, color: '#e0e8ff' } },
+            tooltip: { ...CHART_THEME.tooltip, trigger: 'axis' },
+            xAxis: { type: 'category', data: labels, ...CHART_THEME.xAxis,
+                     axisLabel: { ...CHART_THEME.xAxis.axisLabel, rotate: 20, interval: 0 } },
+            yAxis: { type: 'value', ...CHART_THEME.yAxis, name: unit },
+            series: [{
+                type: 'bar', data: values, barWidth: '45%',
+                itemStyle: {
+                    borderRadius: [6, 6, 0, 0],
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: '#00d4ff' }, { offset: 1, color: 'rgba(0,102,255,0.25)' }])
+                }
+            }]
+        });
+    },
+
+    // 时间趋势折线（可点击联动）
+    trendChart(id, labels, maxForce, passRate) {
+        return this.init(id, {
+            color: ['#00d4ff', '#00ff88'],
+            title: { text: '剥离力趋势', left: 'center', textStyle: { fontSize: 13, color: '#e0e8ff' } },
+            tooltip: { ...CHART_THEME.tooltip, trigger: 'axis' },
+            legend: { data: ['峰值力(N)', '合格率(%)'], top: 24, ...CHART_THEME.legend },
+            xAxis: { type: 'category', data: labels, ...CHART_THEME.xAxis,
+                     axisLabel: { ...CHART_THEME.xAxis.axisLabel, rotate: 20 } },
+            yAxis: [
+                { type: 'value', ...CHART_THEME.yAxis, name: 'N' },
+                { type: 'value', ...CHART_THEME.yAxis, name: '%', max: 100, splitLine: { show: false } }
+            ],
+            series: [
+                { name: '峰值力(N)', type: 'line', smooth: true, data: maxForce,
+                  symbolSize: 7, lineStyle: { width: 2 } },
+                { name: '合格率(%)', type: 'line', yAxisIndex: 1, smooth: true, data: passRate,
+                  symbolSize: 7, lineStyle: { width: 2 } }
+            ]
         });
     }
 };

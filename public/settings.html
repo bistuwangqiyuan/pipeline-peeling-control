@@ -61,7 +61,7 @@
                 </div>
 
                 <!-- Audit Log -->
-                <div class="card animate-fade-in-up stagger-3">
+                <div class="card animate-fade-in-up stagger-3" id="auditCard">
                     <div class="card-header">
                         <div class="card-title"><span class="icon">📜</span> 审计日志</div>
                         <div class="flex gap-1">
@@ -74,7 +74,10 @@
                                 <option value="delete">删除</option>
                                 <option value="start_test">启动试验</option>
                                 <option value="stop_test">停止试验</option>
+                                <option value="export_report">导出报告</option>
+                                <option value="update_settings">修改设置</option>
                             </select>
+                            <button class="btn btn-secondary btn-sm" onclick="exportAudit()">导出CSV</button>
                         </div>
                     </div>
                     <div style="overflow-x:auto; max-height:400px;">
@@ -109,6 +112,14 @@
         if (!Auth.requireAuth()) throw new Error('Not authenticated');
         Nav.init();
 
+        const isAdmin = Auth.isAdmin();
+        const canWrite = Auth.canWrite();
+        // 审计日志与数据库初始化仅管理员可见
+        if (!isAdmin) {
+            const ac = document.getElementById('auditCard');
+            if (ac) ac.style.display = 'none';
+        }
+
         let settingsData = {};
         let auditPage = 1;
 
@@ -139,6 +150,7 @@
         }
 
         async function saveSettings() {
+            if (!Auth.requireWrite()) return;
             const inputs = document.querySelectorAll('.setting-input');
             const updates = {};
             inputs.forEach(input => {
@@ -153,7 +165,15 @@
             }
         }
 
+        function exportAudit() {
+            const action = document.getElementById('auditFilter').value;
+            let url = '/admin/audit?export=csv';
+            if (action) url += `&action_filter=${action}`;
+            API.download(url, 'audit_log.csv').catch(e => Utils.showToast(e.message, 'error'));
+        }
+
         async function loadAuditLog() {
+            if (!isAdmin) return;
             const action = document.getElementById('auditFilter').value;
             try {
                 let url = `/admin?action=audit&page=${auditPage}&per_page=30`;

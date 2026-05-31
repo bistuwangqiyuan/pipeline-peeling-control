@@ -68,3 +68,7 @@ def _check_user_auth_code(user_id):
     if result and result.get('auth_code'):
         return result['auth_code'] == 'test12'
     return False
+
+
+def is_admin(user_payload):
+    return bool(user_payload and user_payload.get('role') == 'admin')

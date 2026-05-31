@@ -42,7 +42,7 @@ const PipeVisual = {
                         number: d.strip_number,
                         status: parseFloat(d.force_value) > 0 ? 'active' : 'pending',
                         force: parseFloat(d.force_value),
-                        angle: parseFloat(d.position_angle)
+                        position: parseFloat(d.position_mm)
                     };
                 }
             });
@@ -95,7 +95,7 @@ const PipeVisual = {
             let glowColor = null;
 
             if (strip.status === 'active') {
-                const intensity = Math.min(1, strip.force / 1200);
+                const intensity = Math.min(1, strip.force / 100);
                 const glow = 0.3 + 0.3 * Math.sin(this.glowPhase + i * 0.2);
                 fillColor = `rgba(0, 212, 255, ${0.3 + intensity * 0.5})`;
                 glowColor = `rgba(0, 212, 255, ${glow * intensity})`;

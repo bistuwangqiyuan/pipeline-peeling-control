@@ -3,123 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登录 - 管道防腐层剥离控制系统</title>
+    <title>管道补口自动剥离控制系统 | 智能剥离力检测与质量评定平台</title>
+    <meta name="description" content="面向油气长输管道补口的自动剥离力检测与质量评定平台：0–1000N 高精度力值采集、200ms 实时大屏、逐条带数据分析、Word/ZIP 报告导出、计量溯源，基于真实数据集（679 试样 / 461 万采样点）建模复算。">
+    <meta name="keywords" content="管道补口,防腐层,剥离力,自动剥离,剥离强度,质量检测,热收缩带,管道防腐,SCADA">
+    <meta property="og:title" content="管道补口自动剥离控制系统">
+    <meta property="og:description" content="高精度剥离力检测与质量评定平台，真实数据建模、实时监控、智能分析与报告。">
+    <meta property="og:type" content="website">
+    <link rel="icon" href="/assets/logo.png" type="image/png">
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/base.css">
-    <link rel="stylesheet" href="/css/forms.css">
     <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/animations.css">
     <style>
-        .login-bg-particles {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            overflow: hidden;
-            pointer-events: none;
-            z-index: 0;
-        }
-        .login-bg-particles .particle {
-            position: absolute;
-            width: 2px; height: 2px;
-            background: var(--accent-cyan);
-            border-radius: 50%;
-            opacity: 0.3;
-            animation: float-particle linear infinite;
-        }
-        @keyframes float-particle {
-            0% { transform: translateY(100vh) scale(0); opacity: 0; }
-            10% { opacity: 0.4; }
-            90% { opacity: 0.4; }
-            100% { transform: translateY(-10vh) scale(1); opacity: 0; }
-        }
-        .login-grid-bg {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-image:
-                linear-gradient(rgba(0, 102, 255, 0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 102, 255, 0.03) 1px, transparent 1px);
-            background-size: 60px 60px;
-            z-index: 0;
-        }
+        body { overflow-x: hidden; }
+        .landing-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.9rem 2.5rem; backdrop-filter: blur(12px);
+            background: rgba(10,20,40,0.6); border-bottom: 1px solid var(--border-color); }
+        .landing-nav .brand { display: flex; align-items: center; gap: 0.7rem; font-weight: 700; color: #fff; }
+        .landing-nav .brand img { width: 38px; height: 38px; }
+        .landing-nav .brand span small { display:block; font-size:0.66rem; color:var(--text-secondary); font-weight:500; letter-spacing:1px; }
+        .landing-nav .nav-links { display: flex; align-items: center; gap: 1.6rem; }
+        .landing-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; transition: color .2s; }
+        .landing-nav .nav-links a:hover { color: var(--accent-cyan); }
+        @media (max-width: 820px){ .landing-nav .nav-links .hide-sm { display:none; } .landing-nav{ padding:0.8rem 1.2rem; } }
+
+        .hero { position: relative; min-height: 100vh; display: flex; align-items: center;
+            background:
+                linear-gradient(90deg, rgba(7,16,30,0.96) 0%, rgba(7,16,30,0.78) 42%, rgba(7,16,30,0.35) 100%),
+                url('/assets/hero.png') center right / cover no-repeat; }
+        .hero-inner { max-width: 1200px; margin: 0 auto; padding: 7rem 2.5rem 3rem; width: 100%; }
+        .hero h1 { font-size: clamp(2rem, 4.6vw, 3.6rem); line-height: 1.15; color: #fff; max-width: 760px; }
+        .hero h1 .grad { background: linear-gradient(90deg,#22d3ee,#3b82f6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .hero p.lead { margin-top: 1.3rem; font-size: clamp(1rem,1.6vw,1.25rem); color: var(--text-secondary); max-width: 640px; line-height: 1.7; }
+        .hero-cta { margin-top: 2.2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .hero-metrics { margin-top: 3rem; display: grid; grid-template-columns: repeat(4, minmax(120px,1fr)); gap: 1rem; max-width: 760px; }
+        .hero-metric { background: rgba(13,27,51,0.6); border: 1px solid var(--border-color); border-radius: 14px; padding: 1.1rem 1rem; }
+        .hero-metric .v { font-size: 1.7rem; font-weight: 800; color: var(--accent-cyan); }
+        .hero-metric .l { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem; }
+        @media (max-width: 720px){ .hero-metrics { grid-template-columns: repeat(2,1fr); } }
+
+        .section { max-width: 1200px; margin: 0 auto; padding: 5rem 2.5rem; }
+        .section-title { text-align: center; margin-bottom: 3rem; }
+        .section-title h2 { font-size: clamp(1.6rem,3vw,2.4rem); color: #fff; }
+        .section-title p { color: var(--text-secondary); margin-top: 0.7rem; }
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 1.4rem; }
+        .feature-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px;
+            padding: 1.8rem; transition: transform .25s, border-color .25s, box-shadow .25s; text-decoration: none; display: block; }
+        .feature-card:hover { transform: translateY(-6px); border-color: var(--accent-cyan);
+            box-shadow: 0 16px 40px rgba(0,102,255,0.18); }
+        .feature-card .ic { font-size: 2rem; }
+        .feature-card h3 { color: #fff; margin: 0.9rem 0 0.5rem; font-size: 1.15rem; }
+        .feature-card p { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
+
+        .figures-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 1.4rem; }
+        .figure-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; }
+        .figure-card img { width: 100%; display: block; }
+        .figure-card .cap { padding: 0.9rem 1.1rem; color: var(--text-secondary); font-size: 0.85rem; }
+
+        .arch { background: rgba(13,27,51,0.45); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+        .arch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 1rem; }
+        .arch-item { text-align: center; padding: 1.2rem; }
+        .arch-item .v { color: var(--accent-cyan); font-weight: 700; font-size: 1.05rem; }
+        .arch-item .l { color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.4rem; }
+
+        .landing-footer { background: #070e1c; border-top: 1px solid var(--border-color); padding: 3rem 2.5rem 2rem; }
+        .footer-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 2rem; }
+        .footer-inner h4 { color: #fff; margin-bottom: 0.9rem; font-size: 0.95rem; }
+        .footer-inner a, .footer-inner p { color: var(--text-secondary); text-decoration: none; font-size: 0.85rem; line-height: 2; display: block; }
+        .footer-inner a:hover { color: var(--accent-cyan); }
+        .footer-bottom { max-width: 1200px; margin: 2rem auto 0; padding-top: 1.5rem; border-top: 1px solid var(--border-color);
+            color: var(--text-dim); font-size: 0.8rem; text-align: center; }
+        @media (max-width: 720px){ .footer-inner { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
-    <div class="login-grid-bg"></div>
-    <div class="login-bg-particles" id="particles"></div>
+    <nav class="landing-nav">
+        <a class="brand" href="/" style="text-decoration:none">
+            <img src="/assets/logo.png" alt="Logo">
+            <span>管道补口自动剥离控制系统<small>PIPELINE PEELING CONTROL</small></span>
+        </a>
+        <div class="nav-links">
+            <a href="#features" class="hide-sm">功能模块</a>
+            <a href="#figures" class="hide-sm">数据复现</a>
+            <a href="#arch" class="hide-sm">技术架构</a>
+            <a href="/dashboard.html">实时大屏</a>
+            <a href="/login.html" class="btn btn-primary btn-sm" id="loginLink">登录</a>
+        </div>
+    </nav>
 
-    <div class="login-container">
-        <div class="login-card">
-            <div class="login-logo">
-                <div class="logo-icon">⚙</div>
-                <h2>管道防腐层剥离控制系统</h2>
-                <p>Pipeline Anti-Corrosion Layer Peeling Control</p>
+    <header class="hero">
+        <div class="hero-inner">
+            <h1>管道补口防腐层<br><span class="grad">自动剥离力检测</span>与质量评定平台</h1>
+            <p class="lead">面向油气长输管道补口热收缩带，0–1000N 高精度力-位同步采集、200ms 实时监控大屏、
+                逐条带智能分析与一键 Word/ZIP 报告，全部指标基于真实数据集由可复现 Python 模型计算。</p>
+            <div class="hero-cta">
+                <a href="/dashboard.html" class="btn btn-primary btn-lg">进入实时大屏</a>
+                <a href="/analysis.html" class="btn btn-secondary btn-lg">查看数据分析</a>
             </div>
-
-            <form class="login-form" id="loginForm" onsubmit="return handleLogin(event)">
-                <div class="form-group">
-                    <label class="form-label">用户名</label>
-                    <input type="text" class="form-input" id="username" placeholder="请输入用户名" required autocomplete="username">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">密码</label>
-                    <input type="password" class="form-input" id="password" placeholder="请输入密码" required autocomplete="current-password">
-                </div>
-                <div id="loginError" class="form-error" style="display:none; margin-bottom:0.75rem;"></div>
-                <button type="submit" class="btn btn-primary btn-lg" id="loginBtn">
-                    登 录
-                </button>
-            </form>
-
-            <div class="login-footer">
-                还没有账号？<a href="/register.html">立即注册</a>
+            <div class="hero-metrics">
+                <div class="hero-metric"><div class="v">60.83 N</div><div class="l">平均剥离力</div></div>
+                <div class="hero-metric"><div class="v">98.49 N</div><div class="l">平均峰值力</div></div>
+                <div class="hero-metric"><div class="v">47.5%</div><div class="l">合格率(≥70N)</div></div>
+                <div class="hero-metric"><div class="v">679</div><div class="l">真实试样数</div></div>
             </div>
         </div>
-    </div>
+    </header>
+
+    <section class="section" id="features">
+        <div class="section-title">
+            <h2>七大功能模块</h2>
+            <p>覆盖检测、监控、分析、评定、管理全流程的浏览器/服务器三层架构系统</p>
+        </div>
+        <div class="feature-grid">
+            <a class="feature-card" href="/dashboard.html"><div class="ic">📊</div><h3>实时监控大屏</h3><p>管道横截面可视化、最多 30 条带滚动力曲线、KPI 卡与报警，200ms 高频刷新。</p></a>
+            <a class="feature-card" href="/control.html"><div class="ic">🎛</div><h3>试验控制</h3><p>启动 / 停止 / 紧急中止剥离试验，恒速 1–100mm/min 可配，过程实时回传。</p></a>
+            <a class="feature-card" href="/analysis.html"><div class="ic">📈</div><h3>数据分析</h3><p>趋势、对比、直方图与累积分布，点击柱条联动钻取单条带力-位曲线。</p></a>
+            <a class="feature-card" href="/projects.html"><div class="ic">📁</div><h3>项目管理</h3><p>管道 / 防腐层参数化建项，试验与数据点全程可追溯。</p></a>
+            <a class="feature-card" href="/reports.html"><div class="ic">📋</div><h3>报告导出</h3><p>一键生成单试验 Word 报告，项目级批量打包 ZIP，含统计表与合格判定。</p></a>
+            <a class="feature-card" href="/metrology.html"><div class="ic">🛰</div><h3>计量溯源</h3><p>速度 / 定位 / 力值三项标定，溯源至国家计量基准，精度优于 ±0.1%FS。</p></a>
+            <a class="feature-card" href="/settings.html"><div class="ic">⚙</div><h3>系统设置与审计</h3><p>阈值与采样参数集中配置，全量写操作审计日志可追溯、可导出。</p></a>
+        </div>
+    </section>
+
+    <section class="section" id="figures">
+        <div class="section-title">
+            <h2>真实数据 · 可复现建模</h2>
+            <p>下列图表由 Python 直接读取 679 个真实试样 CSV 计算并复现论文图 5-6 / 5-7 / 5-8</p>
+        </div>
+        <div class="figures-grid">
+            <div class="figure-card"><img src="/assets/figures/fig_5_6_force_displacement.png" alt="剥离力-位移曲线"><div class="cap">图 5-6 实测拉力-位移曲线（P1016R-02F 第30条带，96N 平台 + 缺陷下凹）</div></div>
+            <div class="figure-card"><img src="/assets/figures/fig_5_7_heatmap.png" alt="剥离力热力图"><div class="cap">图 5-7 补口剥离力空间分布热力图（82 条带 / 近 2.8m 行程）</div></div>
+            <div class="figure-card"><img src="/assets/figures/fig_5_8_histogram.png" alt="剥离力直方图"><div class="cap">图 5-8 剥离力幅值分布直方图（双峰：良好粘接 ~96N / 缺陷 20~30N）</div></div>
+        </div>
+    </section>
+
+    <section class="arch" id="arch">
+        <div class="section">
+            <div class="section-title">
+                <h2>技术架构</h2>
+                <p>静态前端 + Vercel Serverless (Python) + Neon PostgreSQL（论文 6 表模型）</p>
+            </div>
+            <div class="arch-grid">
+                <div class="arch-item"><div class="v">0–1000 N</div><div class="l">S 型传感器量程 · ±0.1%FS</div></div>
+                <div class="arch-item"><div class="v">200 ms</div><div class="l">实时刷新周期</div></div>
+                <div class="arch-item"><div class="v">JWT + bcrypt</div><div class="l">三角色鉴权 admin/user/guest</div></div>
+                <div class="arch-item"><div class="v">461 万</div><div class="l">力-位采样点（全集）</div></div>
+                <div class="arch-item"><div class="v">REST API</div><div class="l">路径式接口 · 游客只读</div></div>
+                <div class="arch-item"><div class="v">ECharts</div><div class="l">高端科技蓝可视化</div></div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="landing-footer">
+        <div class="footer-inner">
+            <div>
+                <h4>管道补口自动剥离控制系统</h4>
+                <p>Pipeline Joint-Coating Peeling Control System</p>
+                <p>面向油气长输管道补口防腐层的剥离力自动检测与质量评定平台，<br>以真实试验数据为依据，提供从采集、监控到分析、评定的一站式能力。</p>
+            </div>
+            <div>
+                <h4>功能</h4>
+                <a href="/dashboard.html">实时监控大屏</a>
+                <a href="/control.html">试验控制</a>
+                <a href="/analysis.html">数据分析</a>
+                <a href="/reports.html">报告导出</a>
+            </div>
+            <div>
+                <h4>账户</h4>
+                <a href="/login.html">登录</a>
+                <a href="/register.html">注册</a>
+                <a href="/metrology.html">计量溯源</a>
+                <a href="/settings.html">系统设置</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            © 2026 管道补口自动剥离控制系统 · 基于真实数据集建模复算 · 部署于 Vercel + Neon PostgreSQL
+        </div>
+    </footer>
 
     <script src="/js/config.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/auth.js"></script>
-    <script src="/js/utils.js"></script>
     <script>
+        // 已登录则将“登录”替换为“进入控制台”
         if (Auth.isLoggedIn()) {
-            window.location.href = PAGES.DASHBOARD;
+            const link = document.getElementById('loginLink');
+            link.textContent = '进入控制台';
+            link.href = '/dashboard.html';
         }
-
-        // Init DB on first visit
+        // 首访触发数据库初始化（幂等）
         fetch('/api/init_db').catch(() => {});
-
-        // Particles
-        const particleContainer = document.getElementById('particles');
-        for (let i = 0; i < 30; i++) {
-            const p = document.createElement('div');
-            p.className = 'particle';
-            p.style.left = Math.random() * 100 + '%';
-            p.style.animationDuration = (8 + Math.random() * 12) + 's';
-            p.style.animationDelay = Math.random() * 10 + 's';
-            p.style.width = p.style.height = (1 + Math.random() * 2) + 'px';
-            particleContainer.appendChild(p);
-        }
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const btn = document.getElementById('loginBtn');
-            const errEl = document.getElementById('loginError');
-            errEl.style.display = 'none';
-            btn.disabled = true;
-            btn.textContent = '登录中...';
-
-            try {
-                const username = document.getElementById('username').value.trim();
-                const password = document.getElementById('password').value;
-                await Auth.login(username, password);
-                window.location.href = PAGES.DASHBOARD;
-            } catch (err) {
-                errEl.textContent = err.message;
-                errEl.style.display = 'block';
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '登 录';
-            }
-        }
     </script>
 </body>
 </html>

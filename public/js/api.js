@@ -24,7 +24,10 @@ const API = {
             if (!response.ok) {
                 if (response.status === 401) {
                     Auth.clear();
-                    if (!window.location.pathname.includes('index.html') && window.location.pathname !== '/') {
+                    const path = window.location.pathname;
+                    const isPublicPage = path === '/' || path === '/index.html'
+                        || path.includes('login') || path.includes('register');
+                    if (!isPublicPage) {
                         window.location.href = PAGES.LOGIN;
                     }
                 }
@@ -54,5 +57,30 @@ const API = {
 
     delete(endpoint) {
         return this.request('DELETE', endpoint);
+    },
+
+    // 带鉴权头的文件下载（CSV / docx / zip），window.open 无法携带 token 时使用
+    async download(endpoint, fallbackName = 'download') {
+        const url = CONFIG.API_BASE + endpoint;
+        const headers = {};
+        const token = localStorage.getItem(CONFIG.TOKEN_KEY);
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const resp = await fetch(url, { headers });
+        if (!resp.ok) {
+            let msg = `下载失败 (${resp.status})`;
+            try { const j = await resp.json(); msg = j.error || msg; } catch (e) {}
+            throw new Error(msg);
+        }
+        const disp = resp.headers.get('Content-Disposition') || '';
+        const m = disp.match(/filename=([^;]+)/);
+        const name = m ? decodeURIComponent(m[1].trim().replace(/"/g, '')) : fallbackName;
+        const blob = await resp.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(link.href), 4000);
     },
 };

@@ -34,8 +34,8 @@
                             <span class="value" id="dashTestNum">-</span>
                         </div>
                         <div class="status-item">
-                            <span>当前角度:</span>
-                            <span class="value" id="dashAngle">0°</span>
+                            <span>当前位置:</span>
+                            <span class="value" id="dashAngle">0 mm</span>
                         </div>
                         <div class="status-item">
                             <span>进度:</span>
@@ -113,19 +113,19 @@
                         <div style="padding:0.5rem 0;">
                             <div class="param-card mb-1">
                                 <div class="param-label">管道直径</div>
-                                <div class="param-value">1000 mm</div>
+                                <div class="param-value">1016 mm</div>
                             </div>
                             <div class="param-card mb-1">
                                 <div class="param-label">防腐层宽度</div>
                                 <div class="param-value">600 mm</div>
                             </div>
                             <div class="param-card mb-1">
-                                <div class="param-label">条带数量</div>
+                                <div class="param-label">条带规格</div>
                                 <div class="param-value">30 × 20mm</div>
                             </div>
                             <div class="param-card">
-                                <div class="param-label">预估拉力</div>
-                                <div class="param-value">30,000 N</div>
+                                <div class="param-label">良好粘接平台</div>
+                                <div class="param-value">≈ 96 N</div>
                             </div>
                         </div>
                     </div>
@@ -142,7 +142,7 @@
     <script src="/js/charts.js"></script>
     <script src="/js/pipe-visual.js"></script>
     <script>
-        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        // 实时大屏对游客开放（只读）
         Nav.init();
 
         let pollTimer = null;
@@ -237,7 +237,7 @@
             // Progress
             const progress = data.progress || 0;
             document.getElementById('dashAngle').textContent =
-                `${Utils.formatNumber(data.current_angle, 1)}°`;
+                `${Utils.formatNumber(data.current_position, 0)} mm`;
             document.getElementById('dashProgress').textContent =
                 `${Utils.formatNumber(progress, 1)}%`;
             document.getElementById('progressPercent').textContent =
@@ -258,7 +258,7 @@
                     if (valEl) valEl.textContent = f.toFixed(0);
                     if (cell) {
                         cell.className = 'force-gauge-cell' + (f > 0 ? ' active' : '');
-                        if (f > 1500) cell.classList.add('warning');
+                        if (f > CONFIG.FORCE_ALARM_HIGH) cell.classList.add('warning');
                     }
                 });
             }
@@ -281,17 +281,17 @@
             // Realtime line chart - build from recent history
             if (data.recent_history && data.recent_history.length > 0) {
                 const byStrip = {};
-                const angles = new Set();
+                const positions = new Set();
 
                 data.recent_history.forEach(d => {
                     const sn = d.strip_number;
-                    const angle = parseFloat(d.position_angle).toFixed(1);
+                    const pos = parseFloat(d.position_mm).toFixed(0);
                     if (!byStrip[sn]) byStrip[sn] = [];
-                    byStrip[sn].push({ angle, force: parseFloat(d.force_value) });
-                    angles.add(angle);
+                    byStrip[sn].push({ pos, force: parseFloat(d.force_value) });
+                    positions.add(pos);
                 });
 
-                const sortedAngles = [...angles].sort((a, b) => parseFloat(a) - parseFloat(b));
+                const sortedPositions = [...positions].sort((a, b) => parseFloat(a) - parseFloat(b));
                 const series = [];
                 for (let i = 1; i <= 30; i++) {
                     const stripPoints = byStrip[i] || [];
@@ -301,7 +301,7 @@
                 }
 
                 Charts.update('realtimeChart', {
-                    xAxis: { data: sortedAngles },
+                    xAxis: { data: sortedPositions },
                     series: series.map((s, i) => ({
                         ...s,
                         name: `条带${i + 1}`,
