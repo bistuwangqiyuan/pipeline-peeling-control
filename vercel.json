@@ -4,7 +4,12 @@
     {
       "src": "api/*.py",
       "use": "@vercel/python",
-      "config": { "includeFiles": ["api/_lib/**", "analysis/seed_data.json"] }
+      "config": {
+        "includeFiles": [
+          "api/_lib/**",
+          "analysis/seed_data.json"
+        ]
+      }
     },
     {
       "src": "public/**",
@@ -12,10 +17,34 @@
     }
   ],
   "routes": [
-    { "src": "/api/auth/([^/?]+)", "dest": "/api/auth?action=$1" },
-    { "src": "/api/test_ops/([^/?]+)", "dest": "/api/test_ops?action=$1" },
-    { "src": "/api/admin/([^/?]+)", "dest": "/api/admin?action=$1" },
-    { "src": "/api/reports/([^/?]+)", "dest": "/api/reports?action=$1" },
+    {
+      "src": "/27f443319afbb969d4da6550c9e3ba9b.txt",
+      "dest": "/public/27f443319afbb969d4da6550c9e3ba9b.txt"
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "/public/sitemap.xml"
+    },
+    {
+      "src": "/robots.txt",
+      "dest": "/public/robots.txt"
+    },
+    {
+      "src": "/api/auth/([^/?]+)",
+      "dest": "/api/auth?action=$1"
+    },
+    {
+      "src": "/api/test_ops/([^/?]+)",
+      "dest": "/api/test_ops?action=$1"
+    },
+    {
+      "src": "/api/admin/([^/?]+)",
+      "dest": "/api/admin?action=$1"
+    },
+    {
+      "src": "/api/reports/([^/?]+)",
+      "dest": "/api/reports?action=$1"
+    },
     {
       "src": "/api/(.*)",
       "dest": "/api/$1",
@@ -25,26 +54,89 @@
         "Access-Control-Allow-Headers": "Content-Type, Authorization"
       }
     },
-    { "src": "/css/(.*)", "dest": "/public/css/$1" },
-    { "src": "/js/(.*)", "dest": "/public/js/$1" },
-    { "src": "/assets/(.*)", "dest": "/public/assets/$1" },
-    { "src": "/login", "dest": "/public/login.html" },
-    { "src": "/register", "dest": "/public/register.html" },
-    { "src": "/dashboard", "dest": "/public/dashboard.html" },
-    { "src": "/control", "dest": "/public/control.html" },
-    { "src": "/projects", "dest": "/public/projects.html" },
-    { "src": "/analysis", "dest": "/public/analysis.html" },
-    { "src": "/reports", "dest": "/public/reports.html" },
-    { "src": "/users", "dest": "/public/users.html" },
-    { "src": "/settings", "dest": "/public/settings.html" },
-    { "src": "/metrology", "dest": "/public/metrology.html" },
-    { "src": "/(.*\\.html)", "dest": "/public/$1" },
-    { "src": "/(.*\\.css)", "dest": "/public/$1" },
-    { "src": "/(.*\\.js)", "dest": "/public/$1" },
-    { "src": "/(.*\\.png)", "dest": "/public/$1" },
-    { "src": "/(.*\\.jpg)", "dest": "/public/$1" },
-    { "src": "/(.*\\.svg)", "dest": "/public/$1" },
-    { "src": "/(.*\\.ico)", "dest": "/public/$1" },
-    { "src": "/", "dest": "/public/index.html" }
+    {
+      "src": "/css/(.*)",
+      "dest": "/public/css/$1"
+    },
+    {
+      "src": "/js/(.*)",
+      "dest": "/public/js/$1"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/public/assets/$1"
+    },
+    {
+      "src": "/login",
+      "dest": "/public/login.html"
+    },
+    {
+      "src": "/register",
+      "dest": "/public/register.html"
+    },
+    {
+      "src": "/dashboard",
+      "dest": "/public/dashboard.html"
+    },
+    {
+      "src": "/control",
+      "dest": "/public/control.html"
+    },
+    {
+      "src": "/projects",
+      "dest": "/public/projects.html"
+    },
+    {
+      "src": "/analysis",
+      "dest": "/public/analysis.html"
+    },
+    {
+      "src": "/reports",
+      "dest": "/public/reports.html"
+    },
+    {
+      "src": "/users",
+      "dest": "/public/users.html"
+    },
+    {
+      "src": "/settings",
+      "dest": "/public/settings.html"
+    },
+    {
+      "src": "/metrology",
+      "dest": "/public/metrology.html"
+    },
+    {
+      "src": "/(.*\\.html)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.css)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.js)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.png)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.jpg)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.svg)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.ico)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/",
+      "dest": "/public/index.html"
+    }
   ]
 }
